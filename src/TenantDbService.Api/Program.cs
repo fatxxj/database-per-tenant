@@ -21,6 +21,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+// Add HttpContextAccessor for tenant resolution
+builder.Services.AddHttpContextAccessor();
+
 // Configuration
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<ConnectionSettings>(builder.Configuration.GetSection("ConnectionStrings"));
