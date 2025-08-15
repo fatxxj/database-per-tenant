@@ -37,7 +37,8 @@ make demo
 
 or manual docker:
 # Start services
-docker-compose -f ops/docker-compose.yml up -d
+docker-compose build --no-cache api
+docker-compose -f ops/docker-compose.yml up --build -d
 
 # Check logs
 docker-compose -f ops/docker-compose.yml logs -f

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.Json;
 using TenantDbService.Api.Data.Mongo;
 
 namespace TenantDbService.Api.Features.Events;
@@ -54,11 +55,14 @@ public class EventsRepository
         // Ensure index exists
         await EnsureIndexesAsync(collection);
 
+        // Convert JsonElement to dictionary if needed
+        var convertedPayload = ConvertPayload(payload);
+
         var evt = new Event
         {
             Id = ObjectId.GenerateNewId(),
             Type = type,
-            Payload = payload,
+            Payload = convertedPayload,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -141,5 +145,44 @@ public class EventsRepository
         {
             _indexSemaphore.Release();
         }
+    }
+
+    private object ConvertPayload(object payload)
+    {
+        if (payload is JsonElement jsonElement)
+        {
+            return jsonElement.ValueKind switch
+            {
+                JsonValueKind.Object => ConvertJsonObjectToDictionary(jsonElement),
+                JsonValueKind.Array => ConvertJsonArrayToList(jsonElement),
+                JsonValueKind.String => jsonElement.GetString() ?? "",
+                JsonValueKind.Number => jsonElement.TryGetInt32(out var intValue) ? intValue : jsonElement.GetDouble(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => null!,
+                _ => jsonElement.ToString()
+            };
+        }
+        return payload;
+    }
+
+    private Dictionary<string, object> ConvertJsonObjectToDictionary(JsonElement element)
+    {
+        var dict = new Dictionary<string, object>();
+        foreach (var property in element.EnumerateObject())
+        {
+            dict[property.Name] = ConvertPayload(property.Value);
+        }
+        return dict;
+    }
+
+    private List<object> ConvertJsonArrayToList(JsonElement element)
+    {
+        var list = new List<object>();
+        foreach (var item in element.EnumerateArray())
+        {
+            list.Add(ConvertPayload(item));
+        }
+        return list;
     }
 }
