@@ -20,7 +20,7 @@ WORKDIR "/src/src/TenantDbService.Api"
 RUN dotnet build "TenantDbService.Api.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "TenantDbService.Api.csproj" -c Release -o /app/publish
+RUN dotnet publish "TenantDbService.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
@@ -29,6 +29,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=publish /app/publish .
+
+# Debug: List contents to verify files are copied
+RUN ls -la
 
 # Create a non-root user
 RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app

@@ -55,27 +55,30 @@ public class CatalogRepository
 
     public async Task CreateTenantAsync(Tenant tenant, TenantConnections connections)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        
-        try
+        await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            _context.Tenants.Add(tenant);
-            _context.TenantConnections.Add(connections);
+            using var transaction = await _context.Database.BeginTransactionAsync();
             
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            
-            // Invalidate cache
-            var cacheKey = string.Format(ConnectionCacheKey, tenant.Id);
-            _cache.Remove(cacheKey);
-            
-            _logger.LogInformation("Created tenant: {TenantId} with name: {TenantName}", tenant.Id, tenant.Name);
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
+            try
+            {
+                _context.Tenants.Add(tenant);
+                _context.TenantConnections.Add(connections);
+                
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                
+                // Invalidate cache
+                var cacheKey = string.Format(ConnectionCacheKey, tenant.Id);
+                _cache.Remove(cacheKey);
+                
+                _logger.LogInformation("Created tenant: {TenantId} with name: {TenantName}", tenant.Id, tenant.Name);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
     }
 
     public async Task<List<TenantInfo>> GetAllTenantsAsync()

@@ -52,8 +52,8 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
-    volumes:
-      - ../src/TenantDbService.Api:/app
+    # volumes:
+    #   - ../src/TenantDbService.Api:/app
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 30s

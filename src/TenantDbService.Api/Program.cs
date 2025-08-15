@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -32,7 +33,14 @@ builder.Services.Configure<MongoSettings>(builder.Configuration.GetSection("Mong
 
 // Database contexts
 builder.Services.AddDbContext<CatalogDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("Catalog")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("Catalog"), 
+        sqlServerOptionsAction: sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null);
+        }));
 
 // Repositories and services
 builder.Services.AddScoped<CatalogRepository>();
@@ -43,6 +51,9 @@ builder.Services.AddScoped<EventsRepository>();
 // Connection factories
 builder.Services.AddScoped<SqlConnectionFactory>();
 builder.Services.AddScoped<MongoDbFactory>();
+
+// Auth services
+builder.Services.AddScoped<JwtExtensions>();
 
 // Caching
 builder.Services.AddMemoryCache();
@@ -158,7 +169,7 @@ app.MapGet("/health/ready", async (CatalogDbContext catalogDb, HttpContext conte
 });
 
 // Auth endpoints
-app.MapPost("/auth/dev-token", (JwtExtensions jwtExtensions, DevTokenRequest request) =>
+app.MapPost("/auth/dev-token", (JwtExtensions jwtExtensions, [FromBody] DevTokenRequest request) =>
 {
     if (string.IsNullOrEmpty(request.TenantId))
         return Results.BadRequest(new { error = "TenantId is required" });
@@ -169,7 +180,7 @@ app.MapPost("/auth/dev-token", (JwtExtensions jwtExtensions, DevTokenRequest req
 .WithName("GenerateDevToken");
 
 // Tenant management endpoints
-app.MapPost("/tenants", async (ProvisioningService provisioningService, CreateTenantRequest request) =>
+app.MapPost("/tenants", async (ProvisioningService provisioningService, [FromBody] CreateTenantRequest request) =>
 {
     if (string.IsNullOrEmpty(request.Name))
         return Results.BadRequest(new { error = "Name is required" });
@@ -195,7 +206,7 @@ app.MapGet("/api/orders", async (OrdersRepository ordersRepository, HttpContext 
 .RequireAuthorization()
 .WithName("GetOrders");
 
-app.MapPost("/api/orders", async (OrdersRepository ordersRepository, CreateOrderRequest request) =>
+app.MapPost("/api/orders", async (OrdersRepository ordersRepository, [FromBody] CreateOrderRequest request) =>
 {
     if (string.IsNullOrEmpty(request.Code))
         return Results.BadRequest(new { error = "Code is required" });
@@ -226,7 +237,7 @@ app.MapGet("/api/events", async (EventsRepository eventsRepository, string? type
 .RequireAuthorization()
 .WithName("GetEvents");
 
-app.MapPost("/api/events", async (EventsRepository eventsRepository, CreateEventRequest request) =>
+app.MapPost("/api/events", async (EventsRepository eventsRepository, [FromBody] CreateEventRequest request) =>
 {
     if (string.IsNullOrEmpty(request.Type))
         return Results.BadRequest(new { error = "Type is required" });
@@ -237,24 +248,37 @@ app.MapPost("/api/events", async (EventsRepository eventsRepository, CreateEvent
 .RequireAuthorization()
 .WithName("CreateEvent");
 
-// Seed data on first run
+// Initialize database and seed data on first run
 using (var scope = app.Services.CreateScope())
 {
+    var catalogDbContext = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
     var catalogRepository = scope.ServiceProvider.GetRequiredService<CatalogRepository>();
     var provisioningService = scope.ServiceProvider.GetRequiredService<ProvisioningService>();
     var ordersRepository = scope.ServiceProvider.GetRequiredService<OrdersRepository>();
     var eventsRepository = scope.ServiceProvider.GetRequiredService<EventsRepository>();
     
-    // Check if catalog is empty
-    var existingTenants = await catalogRepository.GetAllTenantsAsync();
-    if (!existingTenants.Any())
+    try
     {
-        // Create demo tenant
-        var demoTenantId = await provisioningService.CreateTenantAsync("demo-tenant");
+        // Ensure database is created
+        await catalogDbContext.Database.EnsureCreatedAsync();
+        app.Logger.LogInformation("Catalog database initialized successfully");
         
-        // Create sample data (this would normally be done in a separate service)
-        // For now, we'll just log that seeding is complete
-        app.Logger.LogInformation("Demo tenant created with ID: {TenantId}", demoTenantId);
+        // Check if catalog is empty
+        var existingTenants = await catalogRepository.GetAllTenantsAsync();
+        if (!existingTenants.Any())
+        {
+            // Create demo tenant
+            var demoTenantId = await provisioningService.CreateTenantAsync("demo-tenant");
+            
+            // Create sample data (this would normally be done in a separate service)
+            // For now, we'll just log that seeding is complete
+            app.Logger.LogInformation("Demo tenant created with ID: {TenantId}", demoTenantId);
+        }
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Failed to initialize database");
+        throw;
     }
 }
 
