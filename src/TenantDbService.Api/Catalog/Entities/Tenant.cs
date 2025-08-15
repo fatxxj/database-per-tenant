@@ -18,6 +18,14 @@ public class Tenant
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
+    // Schema configuration for dynamic table creation
+    [StringLength(50)]
+    public string SchemaVersion { get; set; } = "1.0";
+    
+    public string? SchemaDefinition { get; set; } // JSON schema definition
+    
+    public DateTime? SchemaUpdatedAt { get; set; }
+    
     // Navigation property
     public virtual TenantConnections? Connections { get; set; }
 }

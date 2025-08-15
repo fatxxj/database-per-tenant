@@ -12,6 +12,7 @@ public class CatalogRepository
     private readonly IMemoryCache _cache;
     private readonly ILogger<CatalogRepository> _logger;
     private const string ConnectionCacheKey = "tenant_connections_{0}";
+    private const string SchemaCacheKey = "tenant_schema_{0}";
     private const int CacheTtlMinutes = 5;
 
     public CatalogRepository(CatalogDbContext context, IMemoryCache cache, ILogger<CatalogRepository> logger)
@@ -110,5 +111,71 @@ public class CatalogRepository
     {
         return await _context.Tenants
             .AnyAsync(t => t.Name == name && t.Status == "active");
+    }
+
+    // Schema-related methods
+    public async Task<SchemaDefinition?> GetSchemaAsync(string tenantId)
+    {
+        var cacheKey = string.Format(SchemaCacheKey, tenantId);
+        
+        if (_cache.TryGetValue(cacheKey, out SchemaDefinition? cachedSchema))
+        {
+            _logger.LogDebug("Cache hit for tenant schema: {TenantId}", tenantId);
+            return cachedSchema;
+        }
+
+        var tenant = await _context.Tenants
+            .FirstOrDefaultAsync(t => t.Id == tenantId && t.Status == "active");
+
+        if (tenant?.SchemaDefinition == null)
+            return null;
+
+        try
+        {
+            var schema = System.Text.Json.JsonSerializer.Deserialize<SchemaDefinition>(tenant.SchemaDefinition);
+            
+            if (schema != null)
+            {
+                var cacheOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(CacheTtlMinutes)
+                };
+                _cache.Set(cacheKey, schema, cacheOptions);
+                _logger.LogDebug("Cached tenant schema: {TenantId}", tenantId);
+            }
+
+            return schema;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize schema for tenant: {TenantId}", tenantId);
+            return null;
+        }
+    }
+
+    public async Task UpdateSchemaAsync(string tenantId, SchemaDefinition schema)
+    {
+        var tenant = await _context.Tenants.FindAsync(tenantId);
+        if (tenant == null)
+            throw new ArgumentException($"Tenant not found: {tenantId}");
+
+        tenant.SchemaDefinition = System.Text.Json.JsonSerializer.Serialize(schema);
+        tenant.SchemaVersion = schema.Version;
+        tenant.SchemaUpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        // Invalidate cache
+        var cacheKey = string.Format(SchemaCacheKey, tenantId);
+        _cache.Remove(cacheKey);
+
+        _logger.LogInformation("Updated schema for tenant: {TenantId}, version: {Version}", tenantId, schema.Version);
+    }
+
+    public async Task<Tenant?> GetTenantAsync(string tenantId)
+    {
+        return await _context.Tenants
+            .Include(t => t.Connections)
+            .FirstOrDefaultAsync(t => t.Id == tenantId && t.Status == "active");
     }
 }

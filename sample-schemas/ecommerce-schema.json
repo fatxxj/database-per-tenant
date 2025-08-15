@@ -1,0 +1,479 @@
+{
+  "version": "1.0",
+  "name": "E-commerce Schema",
+  "description": "Complete e-commerce database schema with products, orders, customers, and categories",
+  "tables": [
+    {
+      "name": "Products",
+      "description": "Product catalog",
+      "columns": [
+        {
+          "name": "Id",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isPrimaryKey": true,
+          "isNullable": false,
+          "description": "Unique product identifier"
+        },
+        {
+          "name": "Name",
+          "dataType": "nvarchar",
+          "maxLength": 200,
+          "isNullable": false,
+          "description": "Product name"
+        },
+        {
+          "name": "Description",
+          "dataType": "nvarchar",
+          "maxLength": 1000,
+          "isNullable": true,
+          "description": "Product description"
+        },
+        {
+          "name": "Price",
+          "dataType": "decimal",
+          "precision": 18,
+          "scale": 2,
+          "isNullable": false,
+          "description": "Product price"
+        },
+        {
+          "name": "CategoryId",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isNullable": false,
+          "description": "Category reference"
+        },
+        {
+          "name": "StockQuantity",
+          "dataType": "int",
+          "isNullable": false,
+          "defaultValue": "0",
+          "description": "Available stock quantity"
+        },
+        {
+          "name": "IsActive",
+          "dataType": "bit",
+          "isNullable": false,
+          "defaultValue": "1",
+          "description": "Product availability status"
+        },
+        {
+          "name": "CreatedAt",
+          "dataType": "datetime2",
+          "isNullable": false,
+          "defaultValue": "GETUTCDATE()",
+          "description": "Creation timestamp"
+        },
+        {
+          "name": "UpdatedAt",
+          "dataType": "datetime2",
+          "isNullable": false,
+          "defaultValue": "GETUTCDATE()",
+          "description": "Last update timestamp"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "IX_Products_CategoryId",
+          "columns": ["CategoryId"],
+          "isUnique": false,
+          "description": "Index for category lookups"
+        },
+        {
+          "name": "IX_Products_Name",
+          "columns": ["Name"],
+          "isUnique": false,
+          "description": "Index for product name searches"
+        },
+        {
+          "name": "IX_Products_IsActive",
+          "columns": ["IsActive"],
+          "isUnique": false,
+          "description": "Index for active product filtering"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "FK_Products_Categories",
+          "referencedTable": "Categories",
+          "columns": ["CategoryId"],
+          "referencedColumns": ["Id"],
+          "description": "Product to category relationship"
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "description": "Product categories",
+      "columns": [
+        {
+          "name": "Id",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isPrimaryKey": true,
+          "isNullable": false,
+          "description": "Unique category identifier"
+        },
+        {
+          "name": "Name",
+          "dataType": "nvarchar",
+          "maxLength": 100,
+          "isNullable": false,
+          "description": "Category name"
+        },
+        {
+          "name": "Description",
+          "dataType": "nvarchar",
+          "maxLength": 500,
+          "isNullable": true,
+          "description": "Category description"
+        },
+        {
+          "name": "ParentCategoryId",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isNullable": true,
+          "description": "Parent category for hierarchical structure"
+        },
+        {
+          "name": "IsActive",
+          "dataType": "bit",
+          "isNullable": false,
+          "defaultValue": "1",
+          "description": "Category availability status"
+        },
+        {
+          "name": "CreatedAt",
+          "dataType": "datetime2",
+          "isNullable": false,
+          "defaultValue": "GETUTCDATE()",
+          "description": "Creation timestamp"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "IX_Categories_ParentCategoryId",
+          "columns": ["ParentCategoryId"],
+          "isUnique": false,
+          "description": "Index for parent category lookups"
+        },
+        {
+          "name": "IX_Categories_Name",
+          "columns": ["Name"],
+          "isUnique": false,
+          "description": "Index for category name searches"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "FK_Categories_ParentCategory",
+          "referencedTable": "Categories",
+          "columns": ["ParentCategoryId"],
+          "referencedColumns": ["Id"],
+          "description": "Self-referencing foreign key for category hierarchy"
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "description": "Customer information",
+      "columns": [
+        {
+          "name": "Id",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isPrimaryKey": true,
+          "isNullable": false,
+          "description": "Unique customer identifier"
+        },
+        {
+          "name": "Email",
+          "dataType": "nvarchar",
+          "maxLength": 255,
+          "isNullable": false,
+          "description": "Customer email address"
+        },
+        {
+          "name": "FirstName",
+          "dataType": "nvarchar",
+          "maxLength": 100,
+          "isNullable": false,
+          "description": "Customer first name"
+        },
+        {
+          "name": "LastName",
+          "dataType": "nvarchar",
+          "maxLength": 100,
+          "isNullable": false,
+          "description": "Customer last name"
+        },
+        {
+          "name": "Phone",
+          "dataType": "nvarchar",
+          "maxLength": 20,
+          "isNullable": true,
+          "description": "Customer phone number"
+        },
+        {
+          "name": "Address",
+          "dataType": "nvarchar",
+          "maxLength": 500,
+          "isNullable": true,
+          "description": "Customer address"
+        },
+        {
+          "name": "IsActive",
+          "dataType": "bit",
+          "isNullable": false,
+          "defaultValue": "1",
+          "description": "Customer account status"
+        },
+        {
+          "name": "CreatedAt",
+          "dataType": "datetime2",
+          "isNullable": false,
+          "defaultValue": "GETUTCDATE()",
+          "description": "Account creation timestamp"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "IX_Customers_Email",
+          "columns": ["Email"],
+          "isUnique": true,
+          "description": "Unique index for email lookups"
+        },
+        {
+          "name": "IX_Customers_LastName",
+          "columns": ["LastName"],
+          "isUnique": false,
+          "description": "Index for customer name searches"
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "description": "Customer orders",
+      "columns": [
+        {
+          "name": "Id",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isPrimaryKey": true,
+          "isNullable": false,
+          "description": "Unique order identifier"
+        },
+        {
+          "name": "CustomerId",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isNullable": false,
+          "description": "Customer reference"
+        },
+        {
+          "name": "OrderNumber",
+          "dataType": "nvarchar",
+          "maxLength": 20,
+          "isNullable": false,
+          "description": "Human-readable order number"
+        },
+        {
+          "name": "Status",
+          "dataType": "nvarchar",
+          "maxLength": 20,
+          "isNullable": false,
+          "defaultValue": "'Pending'",
+          "description": "Order status"
+        },
+        {
+          "name": "TotalAmount",
+          "dataType": "decimal",
+          "precision": 18,
+          "scale": 2,
+          "isNullable": false,
+          "description": "Order total amount"
+        },
+        {
+          "name": "ShippingAddress",
+          "dataType": "nvarchar",
+          "maxLength": 500,
+          "isNullable": false,
+          "description": "Shipping address"
+        },
+        {
+          "name": "OrderDate",
+          "dataType": "datetime2",
+          "isNullable": false,
+          "defaultValue": "GETUTCDATE()",
+          "description": "Order creation date"
+        },
+        {
+          "name": "ShippedDate",
+          "dataType": "datetime2",
+          "isNullable": true,
+          "description": "Order shipment date"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "IX_Orders_CustomerId",
+          "columns": ["CustomerId"],
+          "isUnique": false,
+          "description": "Index for customer order lookups"
+        },
+        {
+          "name": "IX_Orders_OrderNumber",
+          "columns": ["OrderNumber"],
+          "isUnique": true,
+          "description": "Unique index for order number"
+        },
+        {
+          "name": "IX_Orders_Status",
+          "columns": ["Status"],
+          "isUnique": false,
+          "description": "Index for order status filtering"
+        },
+        {
+          "name": "IX_Orders_OrderDate",
+          "columns": ["OrderDate"],
+          "isUnique": false,
+          "description": "Index for order date sorting"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "FK_Orders_Customers",
+          "referencedTable": "Customers",
+          "columns": ["CustomerId"],
+          "referencedColumns": ["Id"],
+          "description": "Order to customer relationship"
+        }
+      ]
+    },
+    {
+      "name": "OrderItems",
+      "description": "Individual items in orders",
+      "columns": [
+        {
+          "name": "Id",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isPrimaryKey": true,
+          "isNullable": false,
+          "description": "Unique order item identifier"
+        },
+        {
+          "name": "OrderId",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isNullable": false,
+          "description": "Order reference"
+        },
+        {
+          "name": "ProductId",
+          "dataType": "nvarchar",
+          "maxLength": 50,
+          "isNullable": false,
+          "description": "Product reference"
+        },
+        {
+          "name": "Quantity",
+          "dataType": "int",
+          "isNullable": false,
+          "description": "Quantity ordered"
+        },
+        {
+          "name": "UnitPrice",
+          "dataType": "decimal",
+          "precision": 18,
+          "scale": 2,
+          "isNullable": false,
+          "description": "Unit price at time of order"
+        },
+        {
+          "name": "TotalPrice",
+          "dataType": "decimal",
+          "precision": 18,
+          "scale": 2,
+          "isNullable": false,
+          "description": "Total price for this item"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "IX_OrderItems_OrderId",
+          "columns": ["OrderId"],
+          "isUnique": false,
+          "description": "Index for order item lookups"
+        },
+        {
+          "name": "IX_OrderItems_ProductId",
+          "columns": ["ProductId"],
+          "isUnique": false,
+          "description": "Index for product order history"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "FK_OrderItems_Orders",
+          "referencedTable": "Orders",
+          "columns": ["OrderId"],
+          "referencedColumns": ["Id"],
+          "description": "Order item to order relationship"
+        },
+        {
+          "name": "FK_OrderItems_Products",
+          "referencedTable": "Products",
+          "columns": ["ProductId"],
+          "referencedColumns": ["Id"],
+          "description": "Order item to product relationship"
+        }
+      ]
+    }
+  ],
+  "collections": [
+    {
+      "name": "product_reviews",
+      "description": "Product reviews and ratings",
+      "indexes": [
+        {
+          "name": "IX_product_reviews_product_id",
+          "columns": ["product_id"],
+          "isUnique": false,
+          "description": "Index for product review lookups"
+        },
+        {
+          "name": "IX_product_reviews_rating",
+          "columns": ["rating"],
+          "isUnique": false,
+          "description": "Index for rating-based queries"
+        },
+        {
+          "name": "IX_product_reviews_created_at",
+          "columns": ["created_at"],
+          "isUnique": false,
+          "description": "Index for review date sorting"
+        }
+      ]
+    },
+    {
+      "name": "customer_sessions",
+      "description": "Customer browsing sessions",
+      "indexes": [
+        {
+          "name": "IX_customer_sessions_customer_id",
+          "columns": ["customer_id"],
+          "isUnique": false,
+          "description": "Index for customer session lookups"
+        },
+        {
+          "name": "IX_customer_sessions_session_start",
+          "columns": ["session_start"],
+          "isUnique": false,
+          "description": "Index for session time queries"
+        }
+      ]
+    }
+  ]
+}

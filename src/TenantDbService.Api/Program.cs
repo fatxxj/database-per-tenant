@@ -47,6 +47,8 @@ builder.Services.AddScoped<CatalogRepository>();
 builder.Services.AddScoped<ProvisioningService>();
 builder.Services.AddScoped<OrdersRepository>();
 builder.Services.AddScoped<EventsRepository>();
+builder.Services.AddScoped<DynamicSchemaService>();
+builder.Services.AddScoped<DynamicDataService>();
 
 // Connection factories
 builder.Services.AddScoped<SqlConnectionFactory>();
@@ -185,7 +187,7 @@ app.MapPost("/tenants", async (ProvisioningService provisioningService, [FromBod
     if (string.IsNullOrEmpty(request.Name))
         return Results.BadRequest(new { error = "Name is required" });
     
-    var tenantId = await provisioningService.CreateTenantAsync(request.Name);
+    var tenantId = await provisioningService.CreateTenantAsync(request.Name, request.SchemaDefinition);
     return Results.Ok(new { tenantId });
 })
 .WithName("CreateTenant");
@@ -196,6 +198,168 @@ app.MapGet("/tenants", async (CatalogRepository catalogRepository) =>
     return Results.Ok(tenants);
 })
 .WithName("ListTenants");
+
+// Schema management endpoints
+app.MapPost("/tenants/{tenantId}/schema", async (ProvisioningService provisioningService, string tenantId, [FromBody] UpdateSchemaRequest request) =>
+{
+    try
+    {
+        var schemaDefinition = System.Text.Json.JsonSerializer.Deserialize<SchemaDefinition>(request.SchemaDefinition);
+        if (schemaDefinition == null)
+            return Results.BadRequest(new { error = "Invalid schema definition" });
+        
+        await provisioningService.UpdateSchemaAsync(tenantId, schemaDefinition);
+        return Results.Ok(new { message = "Schema updated successfully" });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.RequireAuthorization()
+.WithName("UpdateTenantSchema");
+
+app.MapGet("/tenants/{tenantId}/schema", async (CatalogRepository catalogRepository, string tenantId) =>
+{
+    var schema = await catalogRepository.GetSchemaAsync(tenantId);
+    if (schema == null)
+        return Results.NotFound(new { error = "Schema not found" });
+    
+    return Results.Ok(schema);
+})
+.RequireAuthorization()
+.WithName("GetTenantSchema");
+
+app.MapPost("/schema/validate", (DynamicSchemaService schemaService, [FromBody] SchemaValidationRequest request) =>
+{
+    var validation = schemaService.ValidateSchema(request.SchemaDefinition);
+    return Results.Ok(new SchemaValidationResponse(validation.IsValid, validation.Errors));
+})
+.WithName("ValidateSchema");
+
+// Dynamic data access endpoints
+app.MapGet("/api/data/tables", async (DynamicDataService dataService) =>
+{
+    var tables = await dataService.GetTableNamesAsync();
+    return Results.Ok(tables);
+})
+.RequireAuthorization()
+.WithName("GetTableNames");
+
+app.MapGet("/api/data/tables/{tableName}/schema", async (DynamicDataService dataService, string tableName) =>
+{
+    var schema = await dataService.GetTableSchemaAsync(tableName);
+    return Results.Ok(schema);
+})
+.RequireAuthorization()
+.WithName("GetTableSchema");
+
+app.MapGet("/api/data/tables/{tableName}", async (DynamicDataService dataService, string tableName, string? where, string? orderBy, int? limit) =>
+{
+    var data = await dataService.QueryAsync(tableName, where, orderBy, limit);
+    return Results.Ok(data);
+})
+.RequireAuthorization()
+.WithName("QueryTable");
+
+app.MapGet("/api/data/tables/{tableName}/{id}", async (DynamicDataService dataService, string tableName, string id) =>
+{
+    var data = await dataService.GetByIdAsync(tableName, id);
+    if (data == null)
+        return Results.NotFound();
+    
+    return Results.Ok(data);
+})
+.RequireAuthorization()
+.WithName("GetTableRecord");
+
+app.MapPost("/api/data/tables/{tableName}", async (DynamicDataService dataService, string tableName, [FromBody] Dictionary<string, object> data) =>
+{
+    var id = await dataService.InsertAsync(tableName, data);
+    return Results.Created($"/api/data/tables/{tableName}/{id}", new { id });
+})
+.RequireAuthorization()
+.WithName("InsertTableRecord");
+
+app.MapPut("/api/data/tables/{tableName}/{id}", async (DynamicDataService dataService, string tableName, string id, [FromBody] Dictionary<string, object> data) =>
+{
+    var success = await dataService.UpdateAsync(tableName, id, data);
+    if (!success)
+        return Results.NotFound();
+    
+    return Results.Ok(new { message = "Updated successfully" });
+})
+.RequireAuthorization()
+.WithName("UpdateTableRecord");
+
+app.MapDelete("/api/data/tables/{tableName}/{id}", async (DynamicDataService dataService, string tableName, string id) =>
+{
+    var success = await dataService.DeleteAsync(tableName, id);
+    if (!success)
+        return Results.NotFound();
+    
+    return Results.Ok(new { message = "Deleted successfully" });
+})
+.RequireAuthorization()
+.WithName("DeleteTableRecord");
+
+// MongoDB dynamic data access
+app.MapGet("/api/data/collections", async (DynamicDataService dataService) =>
+{
+    var collections = await dataService.GetCollectionNamesAsync();
+    return Results.Ok(collections);
+})
+.RequireAuthorization()
+.WithName("GetCollectionNames");
+
+app.MapGet("/api/data/collections/{collectionName}", async (DynamicDataService dataService, string collectionName, string? filter, string? sort, int? limit) =>
+{
+    var data = await dataService.QueryMongoAsync(collectionName, filter, sort, limit);
+    return Results.Ok(data);
+})
+.RequireAuthorization()
+.WithName("QueryCollection");
+
+app.MapGet("/api/data/collections/{collectionName}/{id}", async (DynamicDataService dataService, string collectionName, string id) =>
+{
+    var data = await dataService.GetMongoByIdAsync(collectionName, id);
+    if (data == null)
+        return Results.NotFound();
+    
+    return Results.Ok(data);
+})
+.RequireAuthorization()
+.WithName("GetCollectionRecord");
+
+app.MapPost("/api/data/collections/{collectionName}", async (DynamicDataService dataService, string collectionName, [FromBody] Dictionary<string, object> data) =>
+{
+    var id = await dataService.InsertMongoAsync(collectionName, data);
+    return Results.Created($"/api/data/collections/{collectionName}/{id}", new { id });
+})
+.RequireAuthorization()
+.WithName("InsertCollectionRecord");
+
+app.MapPut("/api/data/collections/{collectionName}/{id}", async (DynamicDataService dataService, string collectionName, string id, [FromBody] Dictionary<string, object> data) =>
+{
+    var success = await dataService.UpdateMongoAsync(collectionName, id, data);
+    if (!success)
+        return Results.NotFound();
+    
+    return Results.Ok(new { message = "Updated successfully" });
+})
+.RequireAuthorization()
+.WithName("UpdateCollectionRecord");
+
+app.MapDelete("/api/data/collections/{collectionName}/{id}", async (DynamicDataService dataService, string collectionName, string id) =>
+{
+    var success = await dataService.DeleteMongoAsync(collectionName, id);
+    if (!success)
+        return Results.NotFound();
+    
+    return Results.Ok(new { message = "Deleted successfully" });
+})
+.RequireAuthorization()
+.WithName("DeleteCollectionRecord");
 
 // Orders endpoints (SQL Server)
 app.MapGet("/api/orders", async (OrdersRepository ordersRepository, HttpContext context) =>
@@ -286,6 +450,6 @@ app.Run();
 
 // Request/Response models
 public record DevTokenRequest(string TenantId);
-public record CreateTenantRequest(string Name);
+public record CreateTenantRequest(string Name, SchemaDefinition? SchemaDefinition = null);
 public record CreateOrderRequest(string Code, decimal Amount);
 public record CreateEventRequest(string Type, object Payload);
