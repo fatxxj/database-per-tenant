@@ -1,4 +1,6 @@
+using System.Data;
 using Dapper;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using TenantDbService.Api.Catalog.Entities;
 using TenantDbService.Api.Common;
@@ -16,7 +18,7 @@ public class SqlConnectionFactory
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public async Task<IDbConnection> CreateConnectionAsync()
+    public async Task<SqlConnection> CreateConnectionAsync()
     {
         var context = _httpContextAccessor.HttpContext;
         if (context?.Items.TryGetValue("tenant.ctx", out var tenantCtxObj) != true || 
@@ -26,7 +28,7 @@ public class SqlConnectionFactory
         }
 
         var connectionString = tenantCtx.Connections.SqlServerConnectionString;
-        var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
+        var connection = new SqlConnection(connectionString);
         
         return connection;
     }

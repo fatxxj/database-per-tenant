@@ -1,0 +1,48 @@
+==== ==== === === === === === === ====
+Windows:
+
+# Navigate to project directory
+cd TenantDbService
+
+# Start all services
+.\build.ps1 up
+
+# Check health
+.\build.ps1 health
+
+# Open Swagger UI
+.\build.ps1 swagger
+
+# Run full demo workflow
+.\build.ps1 demo
+
+==== ==== === === === === === === ====
+
+linux:
+cd TenantDbService
+
+# Start all services
+make up
+
+# Check health
+make health
+
+# Open Swagger UI
+make swagger
+
+# Run full demo workflow
+make demo
+
+==== ==== === === === === === === ====
+
+or manual docker:
+# Start services
+docker-compose -f ops/docker-compose.yml up -d
+
+# Check logs
+docker-compose -f ops/docker-compose.yml logs -f
+
+# Stop services
+docker-compose -f ops/docker-compose.yml down
+
+==== ==== === === === === === === ====

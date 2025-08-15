@@ -3,14 +3,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text;
 using TenantDbService.Api.Auth;
 using TenantDbService.Api.Catalog;
+using TenantDbService.Api.Common;
 using TenantDbService.Api.Data.Mongo;
 using TenantDbService.Api.Data.Sql;
 using TenantDbService.Api.Features.Events;
 using TenantDbService.Api.Features.Orders;
-using TenantDbService.Api.Health;
 using TenantDbService.Api.Middleware;
 using TenantDbService.Api.Provisioning;
 
@@ -135,21 +136,21 @@ app.MapGet("/health/ready", async (CatalogDbContext catalogDb, HttpContext conte
             tenantCtxObj is TenantContext tenantCtx)
         {
             // Check SQL Server connection
-            using var sqlFactory = context.RequestServices.GetRequiredService<SqlConnectionFactory>();
+            var sqlFactory = context.RequestServices.GetRequiredService<SqlConnectionFactory>();
             using var sqlConnection = await sqlFactory.CreateConnectionAsync();
             await sqlConnection.OpenAsync();
             
             // Check MongoDB connection
             var mongoFactory = context.RequestServices.GetRequiredService<MongoDbFactory>();
             var mongoDb = await mongoFactory.GetDatabaseAsync();
-            await mongoDb.RunCommandAsync(new MongoDB.Bson.BsonDocument("ping", 1));
+            await mongoDb.RunCommandAsync<MongoDB.Bson.BsonDocument>(new MongoDB.Bson.BsonDocument("ping", 1));
         }
         
         return Results.Ok(new { status = "ready" });
     }
     catch (Exception ex)
     {
-        return Results.StatusCode(503, new { status = "not ready", error = ex.Message });
+        return Results.StatusCode(503);
     }
 });
 
@@ -162,8 +163,7 @@ app.MapPost("/auth/dev-token", (JwtExtensions jwtExtensions, DevTokenRequest req
     var token = jwtExtensions.GenerateDevToken(request.TenantId);
     return Results.Ok(new { token });
 })
-.WithName("GenerateDevToken")
-.WithOpenApi();
+.WithName("GenerateDevToken");
 
 // Tenant management endpoints
 app.MapPost("/tenants", async (ProvisioningService provisioningService, CreateTenantRequest request) =>
@@ -174,16 +174,14 @@ app.MapPost("/tenants", async (ProvisioningService provisioningService, CreateTe
     var tenantId = await provisioningService.CreateTenantAsync(request.Name);
     return Results.Ok(new { tenantId });
 })
-.WithName("CreateTenant")
-.WithOpenApi();
+.WithName("CreateTenant");
 
 app.MapGet("/tenants", async (CatalogRepository catalogRepository) =>
 {
     var tenants = await catalogRepository.GetAllTenantsAsync();
     return Results.Ok(tenants);
 })
-.WithName("ListTenants")
-.WithOpenApi();
+.WithName("ListTenants");
 
 // Orders endpoints (SQL Server)
 app.MapGet("/api/orders", async (OrdersRepository ordersRepository, HttpContext context) =>
@@ -192,8 +190,7 @@ app.MapGet("/api/orders", async (OrdersRepository ordersRepository, HttpContext 
     return Results.Ok(orders);
 })
 .RequireAuthorization()
-.WithName("GetOrders")
-.WithOpenApi();
+.WithName("GetOrders");
 
 app.MapPost("/api/orders", async (OrdersRepository ordersRepository, CreateOrderRequest request) =>
 {
@@ -204,8 +201,7 @@ app.MapPost("/api/orders", async (OrdersRepository ordersRepository, CreateOrder
     return Results.Created($"/api/orders/{order.Id}", order);
 })
 .RequireAuthorization()
-.WithName("CreateOrder")
-.WithOpenApi();
+.WithName("CreateOrder");
 
 app.MapGet("/api/orders/{id}", async (OrdersRepository ordersRepository, string id) =>
 {
@@ -216,8 +212,7 @@ app.MapGet("/api/orders/{id}", async (OrdersRepository ordersRepository, string 
     return Results.Ok(order);
 })
 .RequireAuthorization()
-.WithName("GetOrderById")
-.WithOpenApi();
+.WithName("GetOrderById");
 
 // Events endpoints (MongoDB)
 app.MapGet("/api/events", async (EventsRepository eventsRepository, string? type) =>
@@ -226,8 +221,7 @@ app.MapGet("/api/events", async (EventsRepository eventsRepository, string? type
     return Results.Ok(events);
 })
 .RequireAuthorization()
-.WithName("GetEvents")
-.WithOpenApi();
+.WithName("GetEvents");
 
 app.MapPost("/api/events", async (EventsRepository eventsRepository, CreateEventRequest request) =>
 {
@@ -238,8 +232,7 @@ app.MapPost("/api/events", async (EventsRepository eventsRepository, CreateEvent
     return Results.Created($"/api/events/{evt.Id}", evt);
 })
 .RequireAuthorization()
-.WithName("CreateEvent")
-.WithOpenApi();
+.WithName("CreateEvent");
 
 // Seed data on first run
 using (var scope = app.Services.CreateScope())

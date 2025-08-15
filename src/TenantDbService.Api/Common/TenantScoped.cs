@@ -1,3 +1,5 @@
+using TenantDbService.Api.Catalog.Entities;
+
 namespace TenantDbService.Api.Common;
 
 public class TenantContext
