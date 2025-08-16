@@ -12,14 +12,14 @@ namespace TenantDbService.Api.Common;
 public class DynamicDataService
 {
     private readonly SqlConnectionFactory _sqlFactory;
-    private readonly MongoDbFactory _mongoFactory;
-    private readonly CatalogRepository _catalogRepository;
+    private readonly IMongoDbFactory _mongoFactory;
+    private readonly ICatalogRepository _catalogRepository;
     private readonly ILogger<DynamicDataService> _logger;
 
     public DynamicDataService(
         SqlConnectionFactory sqlFactory,
-        MongoDbFactory mongoFactory,
-        CatalogRepository catalogRepository,
+        IMongoDbFactory mongoFactory,
+        ICatalogRepository catalogRepository,
         ILogger<DynamicDataService> logger)
     {
         _sqlFactory = sqlFactory;

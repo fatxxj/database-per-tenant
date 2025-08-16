@@ -5,7 +5,7 @@ using TenantDbService.Api.Common;
 
 namespace TenantDbService.Api.Data.Mongo;
 
-public class MongoDbFactory
+public class MongoDbFactory : IMongoDbFactory
 {
     private readonly MongoSettings _settings;
     private readonly IHttpContextAccessor _httpContextAccessor;

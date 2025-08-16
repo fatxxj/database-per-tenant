@@ -16,11 +16,11 @@ public class Event
 
 public class EventsRepository
 {
-    private readonly MongoDbFactory _mongoFactory;
+    private readonly IMongoDbFactory _mongoFactory;
     private readonly ILogger<EventsRepository> _logger;
     private readonly SemaphoreSlim _indexSemaphore = new(1, 1);
 
-    public EventsRepository(MongoDbFactory mongoFactory, ILogger<EventsRepository> logger)
+    public EventsRepository(IMongoDbFactory mongoFactory, ILogger<EventsRepository> logger)
     {
         _mongoFactory = mongoFactory;
         _logger = logger;
@@ -49,6 +49,9 @@ public class EventsRepository
 
     public async Task<Event> CreateEventAsync(string type, object payload)
     {
+        if (string.IsNullOrWhiteSpace(type))
+            throw new ArgumentException("Event type cannot be null, empty, or whitespace.", nameof(type));
+
         var database = await _mongoFactory.GetDatabaseAsync();
         var collection = database.GetCollection<Event>("events");
 

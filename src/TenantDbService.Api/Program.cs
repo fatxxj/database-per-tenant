@@ -43,7 +43,7 @@ builder.Services.AddDbContext<CatalogDbContext>(options =>
         }));
 
 // Repositories and services
-builder.Services.AddScoped<CatalogRepository>();
+builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
 builder.Services.AddScoped<ProvisioningService>();
 builder.Services.AddScoped<OrdersRepository>();
 builder.Services.AddScoped<EventsRepository>();
@@ -52,7 +52,7 @@ builder.Services.AddScoped<DynamicDataService>();
 
 // Connection factories
 builder.Services.AddScoped<SqlConnectionFactory>();
-builder.Services.AddScoped<MongoDbFactory>();
+builder.Services.AddScoped<IMongoDbFactory, MongoDbFactory>();
 
 // Auth services
 builder.Services.AddScoped<JwtExtensions>();
@@ -157,7 +157,7 @@ app.MapGet("/health/ready", async (CatalogDbContext catalogDb, HttpContext conte
             await sqlConnection.OpenAsync();
             
             // Check MongoDB connection
-            var mongoFactory = context.RequestServices.GetRequiredService<MongoDbFactory>();
+            var mongoFactory = context.RequestServices.GetRequiredService<IMongoDbFactory>();
             var mongoDb = await mongoFactory.GetDatabaseAsync();
             await mongoDb.RunCommandAsync<MongoDB.Bson.BsonDocument>(new MongoDB.Bson.BsonDocument("ping", 1));
         }
@@ -192,7 +192,7 @@ app.MapPost("/tenants", async (ProvisioningService provisioningService, [FromBod
 })
 .WithName("CreateTenant");
 
-app.MapGet("/tenants", async (CatalogRepository catalogRepository) =>
+app.MapGet("/tenants", async (ICatalogRepository catalogRepository) =>
 {
     var tenants = await catalogRepository.GetAllTenantsAsync();
     return Results.Ok(tenants);
@@ -219,7 +219,7 @@ app.MapPost("/tenants/{tenantId}/schema", async (ProvisioningService provisionin
 .RequireAuthorization()
 .WithName("UpdateTenantSchema");
 
-app.MapGet("/tenants/{tenantId}/schema", async (CatalogRepository catalogRepository, string tenantId) =>
+app.MapGet("/tenants/{tenantId}/schema", async (ICatalogRepository catalogRepository, string tenantId) =>
 {
     var schema = await catalogRepository.GetSchemaAsync(tenantId);
     if (schema == null)
@@ -416,7 +416,7 @@ app.MapPost("/api/events", async (EventsRepository eventsRepository, [FromBody] 
 using (var scope = app.Services.CreateScope())
 {
     var catalogDbContext = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-    var catalogRepository = scope.ServiceProvider.GetRequiredService<CatalogRepository>();
+    var catalogRepository = scope.ServiceProvider.GetRequiredService<ICatalogRepository>();
     var provisioningService = scope.ServiceProvider.GetRequiredService<ProvisioningService>();
     var ordersRepository = scope.ServiceProvider.GetRequiredService<OrdersRepository>();
     var eventsRepository = scope.ServiceProvider.GetRequiredService<EventsRepository>();

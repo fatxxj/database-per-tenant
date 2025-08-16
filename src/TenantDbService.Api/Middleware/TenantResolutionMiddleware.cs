@@ -17,7 +17,7 @@ public class TenantResolutionMiddleware
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context, CatalogRepository catalogRepository)
+    public async Task InvokeAsync(HttpContext context, ICatalogRepository catalogRepository)
     {
         var tenantId = ResolveTenantId(context);
         

@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\TenantDbService.Api\TenantDbService.Api.csproj" />
+    <ProjectReference Include="..\..\src\TenantDbService.Api\TenantDbService.Api.csproj" />
   </ItemGroup>
 
 </Project>

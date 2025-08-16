@@ -6,7 +6,7 @@ using TenantDbService.Api.Common;
 
 namespace TenantDbService.Api.Catalog;
 
-public class CatalogRepository
+public class CatalogRepository : ICatalogRepository
 {
     private readonly CatalogDbContext _context;
     private readonly IMemoryCache _cache;

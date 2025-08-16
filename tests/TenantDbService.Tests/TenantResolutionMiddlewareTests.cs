@@ -14,13 +14,13 @@ namespace TenantDbService.Tests;
 public class TenantResolutionMiddlewareTests
 {
     private readonly Mock<ILogger<TenantResolutionMiddleware>> _loggerMock;
-    private readonly Mock<CatalogRepository> _catalogRepositoryMock;
+    private readonly Mock<ICatalogRepository> _catalogRepositoryMock;
     private readonly TenantResolutionMiddleware _middleware;
 
     public TenantResolutionMiddlewareTests()
     {
         _loggerMock = new Mock<ILogger<TenantResolutionMiddleware>>();
-        _catalogRepositoryMock = new Mock<CatalogRepository>(null!, null!, null!);
+        _catalogRepositoryMock = new Mock<ICatalogRepository>();
         _middleware = new TenantResolutionMiddleware(Next, _loggerMock.Object);
     }
 

@@ -1,23 +1,68 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using TenantDbService.Api.Common;
 using TenantDbService.Api.Data.Mongo;
 using TenantDbService.Api.Features.Events;
 using Xunit;
+using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
 
 namespace TenantDbService.Tests;
 
 public class EventsRepositoryTests
 {
-    private readonly Mock<MongoDbFactory> _mongoFactoryMock;
+    private readonly Mock<IMongoDbFactory> _mongoFactoryMock;
     private readonly Mock<ILogger<EventsRepository>> _loggerMock;
     private readonly EventsRepository _repository;
+    private readonly Mock<IMongoDatabase> _databaseMock;
+    private readonly Mock<IMongoCollection<Event>> _collectionMock;
 
     public EventsRepositoryTests()
     {
-        _mongoFactoryMock = new Mock<MongoDbFactory>(null!, null!);
+        _mongoFactoryMock = new Mock<IMongoDbFactory>();
         _loggerMock = new Mock<ILogger<EventsRepository>>();
+        _databaseMock = new Mock<IMongoDatabase>();
+        _collectionMock = new Mock<IMongoCollection<Event>>();
+        
+        // Setup the mongo factory to return our mocked database
+        _mongoFactoryMock.Setup(x => x.GetDatabaseAsync())
+            .ReturnsAsync(_databaseMock.Object);
+        
+        // Setup the database to return our mocked collection
+        _databaseMock.Setup(x => x.GetCollection<Event>(It.IsAny<string>(), It.IsAny<MongoCollectionSettings>()))
+            .Returns(_collectionMock.Object);
+        
+        // Setup the collection to handle operations
+        _collectionMock.Setup(x => x.InsertOneAsync(It.IsAny<Event>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        
+        _collectionMock.Setup(x => x.FindAsync(It.IsAny<FilterDefinition<Event>>(), It.IsAny<FindOptions<Event, Event>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<IAsyncCursor<Event>>());
+        
+        // Setup DeleteOneAsync to return a successful result
+        var deleteResultMock = new Mock<DeleteResult>();
+        deleteResultMock.Setup(x => x.DeletedCount).Returns(1);
+        _collectionMock.Setup(x => x.DeleteOneAsync(It.IsAny<FilterDefinition<Event>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(deleteResultMock.Object);
+        
+        // Setup index operations
+        var indexManagerMock = new Mock<IMongoIndexManager<Event>>();
+        
+        // Create a simple async cursor that returns empty list
+        var emptyIndexCursor = new EmptyAsyncCursor<BsonDocument>();
+        
+        indexManagerMock.Setup(x => x.ListAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(emptyIndexCursor);
+        
+        indexManagerMock.Setup(x => x.CreateOneAsync(It.IsAny<CreateIndexModel<Event>>(), It.IsAny<CreateOneIndexOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("index_name");
+        
+        _collectionMock.Setup(x => x.Indexes)
+            .Returns(indexManagerMock.Object);
+        
         _repository = new EventsRepository(_mongoFactoryMock.Object, _loggerMock.Object);
     }
 
@@ -159,8 +204,7 @@ public class EventsRepositoryTests
         var result = await _repository.DeleteEventAsync(validId);
 
         // Assert
-        // In a real test with mocked MongoDB, this would return true
-        Assert.True(true); // Placeholder assertion
+        Assert.True(result);
     }
 
     [Fact]
@@ -261,4 +305,16 @@ public class EventsRepositoryTests
         // This would require mocking the MongoDB collection and verifying index creation
         Assert.NotNull(evt);
     }
+}
+
+// Helper class for mocking empty async cursors
+public class EmptyAsyncCursor<T> : IAsyncCursor<T>
+{
+    public IEnumerable<T> Current => new List<T>();
+    
+    public bool MoveNext(CancellationToken cancellationToken = default) => false;
+    
+    public Task<bool> MoveNextAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
+    
+    public void Dispose() { }
 }

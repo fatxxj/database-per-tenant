@@ -14,18 +14,18 @@ namespace TenantDbService.Api.Provisioning;
 
 public class ProvisioningService
 {
-    private readonly CatalogRepository _catalogRepository;
+    private readonly ICatalogRepository _catalogRepository;
     private readonly SqlConnectionFactory _sqlFactory;
-    private readonly MongoDbFactory _mongoFactory;
+    private readonly IMongoDbFactory _mongoFactory;
     private readonly DynamicSchemaService _schemaService;
     private readonly ILogger<ProvisioningService> _logger;
     private readonly SqlServerSettings _sqlSettings;
     private readonly MongoSettings _mongoSettings;
 
     public ProvisioningService(
-        CatalogRepository catalogRepository,
+        ICatalogRepository catalogRepository,
         SqlConnectionFactory sqlFactory,
-        MongoDbFactory mongoFactory,
+        IMongoDbFactory mongoFactory,
         DynamicSchemaService schemaService,
         ILogger<ProvisioningService> logger,
         IOptions<SqlServerSettings> sqlSettings,
