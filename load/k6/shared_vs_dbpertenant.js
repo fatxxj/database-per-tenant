@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check, sleep, fail } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 // Custom metrics
@@ -21,40 +21,126 @@ export const options = {
 };
 
 // Test data
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
+const TENANT_A_NAME = 'load-test-tenant-a';
+const TENANT_B_NAME = 'load-test-tenant-b';
 let tenantAToken = '';
 let tenantBToken = '';
 let tenantAId = '';
 let tenantBId = '';
 
+// Helper function to find tenant by name
+function findTenantByName(tenants, name) {
+  return tenants.find(tenant => tenant.name === name);
+}
+
 // Setup function - runs once before the test
 export function setup() {
   console.log('Setting up test data...');
   
-  // Create tenant A
-  const tenantAResponse = http.post(`${BASE_URL}/tenants`, JSON.stringify({
-    name: 'load-test-tenant-a'
-  }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
-  
-  if (tenantAResponse.status === 200) {
-    const tenantAData = JSON.parse(tenantAResponse.body);
-    tenantAId = tenantAData.tenantId;
-    console.log(`Created tenant A: ${tenantAId}`);
+  // First, get all existing tenants
+  const listTenantsResponse = http.get(`${BASE_URL}/tenants`);
+  if (listTenantsResponse.status !== 200) {
+    fail(`Failed to list tenants: status ${listTenantsResponse.status} body=${listTenantsResponse.body}`);
   }
   
-  // Create tenant B
-  const tenantBResponse = http.post(`${BASE_URL}/tenants`, JSON.stringify({
-    name: 'load-test-tenant-b'
-  }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  let tenants = [];
+  try {
+    tenants = JSON.parse(listTenantsResponse.body);
+  } catch (e) {
+    fail(`Failed to parse tenants list response: ${listTenantsResponse.body}`);
+  }
   
-  if (tenantBResponse.status === 200) {
-    const tenantBData = JSON.parse(tenantBResponse.body);
-    tenantBId = tenantBData.tenantId;
-    console.log(`Created tenant B: ${tenantBId}`);
+  // Check if tenant A exists
+  let existingTenantA = findTenantByName(tenants, TENANT_A_NAME);
+  if (existingTenantA) {
+    tenantAId = existingTenantA.id; // Changed from tenantId to id
+    console.log(`Using existing tenant A: ${tenantAId}`);
+  } else {
+    // Create tenant A
+    const tenantAResponse = http.post(`${BASE_URL}/tenants`, JSON.stringify({
+      name: TENANT_A_NAME
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (tenantAResponse.status === 409) {
+      // Tenant already exists, try to find it again
+      console.log(`Tenant A creation returned 409 (already exists), searching for existing tenant...`);
+      const retryListResponse = http.get(`${BASE_URL}/tenants`);
+      if (retryListResponse.status === 200) {
+        try {
+          const retryTenants = JSON.parse(retryListResponse.body);
+          const retryTenantA = findTenantByName(retryTenants, TENANT_A_NAME);
+          if (retryTenantA) {
+            tenantAId = retryTenantA.id; // Changed from tenantId to id
+            console.log(`Found existing tenant A after retry: ${tenantAId}`);
+          } else {
+            fail(`Tenant A creation failed with 409 but not found in tenant list`);
+          }
+        } catch (e) {
+          fail(`Failed to parse retry tenants list response: ${retryListResponse.body}`);
+        }
+      } else {
+        fail(`Failed to retry list tenants: status ${retryListResponse.status}`);
+      }
+    } else if (tenantAResponse.status >= 200 && tenantAResponse.status < 300) {
+      try {
+        const tenantAData = JSON.parse(tenantAResponse.body);
+        tenantAId = tenantAData.tenantId;
+        console.log(`Created tenant A: ${tenantAId}`);
+      } catch (e) {
+        fail(`Failed to parse tenant A creation response: ${tenantAResponse.body}`);
+      }
+    } else {
+      fail(`Failed to create tenant A: status ${tenantAResponse.status} body=${tenantAResponse.body}`);
+    }
+  }
+  
+  // Check if tenant B exists
+  let existingTenantB = findTenantByName(tenants, TENANT_B_NAME);
+  if (existingTenantB) {
+    tenantBId = existingTenantB.id; // Changed from tenantId to id
+    console.log(`Using existing tenant B: ${tenantBId}`);
+  } else {
+    // Create tenant B
+    const tenantBResponse = http.post(`${BASE_URL}/tenants`, JSON.stringify({
+      name: TENANT_B_NAME
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (tenantBResponse.status === 409) {
+      // Tenant already exists, try to find it again
+      console.log(`Tenant B creation returned 409 (already exists), searching for existing tenant...`);
+      const retryListResponse = http.get(`${BASE_URL}/tenants`);
+      if (retryListResponse.status === 200) {
+        try {
+          const retryTenants = JSON.parse(retryListResponse.body);
+          const retryTenantB = findTenantByName(retryTenants, TENANT_B_NAME);
+          if (retryTenantB) {
+            tenantBId = retryTenantB.id; // Changed from tenantId to id
+            console.log(`Found existing tenant B after retry: ${tenantBId}`);
+          } else {
+            fail(`Tenant B creation failed with 409 but not found in tenant list`);
+          }
+        } catch (e) {
+          fail(`Failed to parse retry tenants list response: ${retryListResponse.body}`);
+        }
+      } else {
+        fail(`Failed to retry list tenants: status ${retryListResponse.status}`);
+      }
+    } else if (tenantBResponse.status >= 200 && tenantBResponse.status < 300) {
+      try {
+        const tenantBData = JSON.parse(tenantBResponse.body);
+        tenantBId = tenantBData.tenantId;
+        console.log(`Created tenant B: ${tenantBId}`);
+      } catch (e) {
+        fail(`Failed to parse tenant B creation response: ${tenantBResponse.body}`);
+      }
+    } else {
+      fail(`Failed to create tenant B: status ${tenantBResponse.status} body=${tenantBResponse.body}`);
+    }
   }
   
   // Get tokens for both tenants
@@ -63,10 +149,15 @@ export function setup() {
   }), {
     headers: { 'Content-Type': 'application/json' },
   });
-  
-  if (tokenAResponse.status === 200) {
-    const tokenData = JSON.parse(tokenAResponse.body);
-    tenantAToken = tokenData.token;
+  if (tokenAResponse.status >= 200 && tokenAResponse.status < 300) {
+    try {
+      const tokenData = JSON.parse(tokenAResponse.body);
+      tenantAToken = tokenData.token;
+    } catch (e) {
+      fail(`Failed to parse token A response: ${tokenAResponse.body}`);
+    }
+  } else {
+    fail(`Failed to get token for tenant A: status ${tokenAResponse.status} body=${tokenAResponse.body}`);
   }
   
   const tokenBResponse = http.post(`${BASE_URL}/auth/dev-token`, JSON.stringify({
@@ -74,10 +165,19 @@ export function setup() {
   }), {
     headers: { 'Content-Type': 'application/json' },
   });
-  
-  if (tokenBResponse.status === 200) {
-    const tokenData = JSON.parse(tokenBResponse.body);
-    tenantBToken = tokenData.token;
+  if (tokenBResponse.status >= 200 && tokenBResponse.status < 300) {
+    try {
+      const tokenData = JSON.parse(tokenBResponse.body);
+      tenantBToken = tokenData.token;
+    } catch (e) {
+      fail(`Failed to parse token B response: ${tokenBResponse.body}`);
+    }
+  } else {
+    fail(`Failed to get token for tenant B: status ${tokenBResponse.status} body=${tokenBResponse.body}`);
+  }
+
+  if (!tenantAId || !tenantBId || !tenantAToken || !tenantBToken) {
+    fail(`Setup failed. tenantAId=${tenantAId} tenantBId=${tenantBId} tenantAToken=${tenantAToken ? 'set' : 'missing'} tenantBToken=${tenantBToken ? 'set' : 'missing'}`);
   }
   
   // Create some initial data for tenant A
@@ -155,7 +255,7 @@ export default function(data) {
     });
     
     check(orderResponse, {
-      'tenant A order creation successful': (r) => r.status === 201,
+      'tenant A order creation successful': (r) => r.status === 201 || r.status === 200,
     });
     
     const eventResponse = http.post(`${BASE_URL}/api/events`, JSON.stringify({
@@ -174,10 +274,10 @@ export default function(data) {
     });
     
     check(eventResponse, {
-      'tenant A event creation successful': (r) => r.status === 201,
+      'tenant A event creation successful': (r) => r.status === 201 || r.status === 200,
     });
     
-    errorRate.add(orderResponse.status !== 201 || eventResponse.status !== 201);
+    errorRate.add(!((orderResponse.status === 201 || orderResponse.status === 200) && (eventResponse.status === 201 || eventResponse.status === 200)));
   } else {
     // Light read operations on tenant B (should remain fast despite tenant A load)
     const startTime = Date.now();

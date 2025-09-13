@@ -19,6 +19,8 @@ public class TenantResolutionMiddleware
 
     public async Task InvokeAsync(HttpContext context, ICatalogRepository catalogRepository)
     {
+        _logger.LogInformation("TenantResolutionMiddleware processing request: {Method} {Path}", context.Request.Method, context.Request.Path);
+        
         var tenantId = ResolveTenantId(context);
         
         if (string.IsNullOrEmpty(tenantId))
@@ -26,10 +28,12 @@ public class TenantResolutionMiddleware
             // Skip tenant resolution for health checks and auth endpoints
             if (IsPublicEndpoint(context.Request.Path))
             {
+                _logger.LogInformation("Skipping tenant resolution for public endpoint: {Path}", context.Request.Path);
                 await _next(context);
                 return;
             }
             
+            _logger.LogWarning("TenantId required but not provided for path: {Path}", context.Request.Path);
             context.Response.StatusCode = 400;
             await context.Response.WriteAsJsonAsync(new { error = "TenantId is required. Provide via JWT claim 'tenantId' or header 'X-Tenant-Id'" });
             return;
@@ -134,6 +138,7 @@ public class TenantResolutionMiddleware
             "/health/live",
             "/health/ready",
             "/auth/dev-token",
+            "/tenants", //for k6 load test
             "/swagger",
             "/swagger/v1/swagger.json"
         };

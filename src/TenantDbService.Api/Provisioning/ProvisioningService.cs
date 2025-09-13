@@ -92,6 +92,12 @@ public class ProvisioningService
         await ProvisionSqlServerDatabaseAsync(tenantId);
         await ProvisionMongoDatabaseAsync(tenantId, mongoDatabaseName);
 
+        // Ensure default SQL schema when no dynamic schema is provided
+        if (schemaDefinition == null)
+        {
+            await EnsureDefaultSqlSchemaAsync(tenantId);
+        }
+
         // Create dynamic schema if provided
         if (schemaDefinition != null)
         {
@@ -229,6 +235,47 @@ public class ProvisioningService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to provision MongoDB database for tenant: {TenantId}", tenantId);
+            throw;
+        }
+    }
+
+    private async Task EnsureDefaultSqlSchemaAsync(string tenantId)
+    {
+        try
+        {
+            var tenantConnectionString = _sqlSettings.Template.Replace("{TENANTID}", tenantId);
+            using var connection = new Microsoft.Data.SqlClient.SqlConnection(tenantConnectionString);
+            await connection.OpenAsync();
+
+            var createOrdersTableSql = @"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Orders')
+BEGIN
+    CREATE TABLE [Orders](
+        [Id] NVARCHAR(50) NOT NULL,
+        [Code] NVARCHAR(50) NOT NULL,
+        [Amount] DECIMAL(18,2) NOT NULL,
+        [CreatedAt] DATETIME2 NOT NULL,
+        CONSTRAINT [PK_Orders] PRIMARY KEY ([Id])
+    );
+END";
+            await connection.ExecuteAsync(createOrdersTableSql);
+
+            var createIndexesSql = @"
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Orders_CreatedAt' AND object_id = OBJECT_ID('Orders'))
+BEGIN
+    CREATE INDEX [IX_Orders_CreatedAt] ON [Orders] ([CreatedAt] DESC);
+END
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Orders_Code' AND object_id = OBJECT_ID('Orders'))
+BEGIN
+    CREATE INDEX [IX_Orders_Code] ON [Orders] ([Code]);
+END";
+            await connection.ExecuteAsync(createIndexesSql);
+
+            _logger.LogInformation("Ensured default Orders table for tenant: {TenantId}", tenantId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to ensure default SQL schema for tenant: {TenantId}", tenantId);
             throw;
         }
     }
