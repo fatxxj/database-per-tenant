@@ -47,3 +47,5 @@ docker-compose -f ops/docker-compose.yml logs -f
 docker-compose -f ops/docker-compose.yml down
 
 ==== ==== === === === === === === ====
+
+ k6 run .\load\k6\shared_vs_dbpertenant.js
