@@ -3,9 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using System.IO;
 using System.Text;
 using TenantDbService.Api.Auth;
 using TenantDbService.Api.Catalog;
@@ -19,20 +17,15 @@ using TenantDbService.Api.Provisioning;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-
-// Add HttpContextAccessor for tenant resolution
 builder.Services.AddHttpContextAccessor();
 
-// Configuration
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<ConnectionSettings>(builder.Configuration.GetSection("ConnectionStrings"));
 builder.Services.Configure<SqlServerSettings>(builder.Configuration.GetSection("SqlServer"));
 builder.Services.Configure<MongoSettings>(builder.Configuration.GetSection("Mongo"));
 
-// Database contexts
 builder.Services.AddDbContext<CatalogDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Catalog"), 
         sqlServerOptionsAction: sqlOptions =>
@@ -43,25 +36,41 @@ builder.Services.AddDbContext<CatalogDbContext>(options =>
                 errorNumbersToAdd: null);
         }));
 
-// Repositories and services
 builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
 builder.Services.AddScoped<ProvisioningService>();
 builder.Services.AddScoped<OrdersRepository>();
 builder.Services.AddScoped<EventsRepository>();
 builder.Services.AddScoped<DynamicSchemaService>();
 builder.Services.AddScoped<DynamicDataService>();
-
-// Connection factories
 builder.Services.AddScoped<SqlConnectionFactory>();
 builder.Services.AddScoped<IMongoDbFactory, MongoDbFactory>();
-
-// Auth services
 builder.Services.AddScoped<JwtExtensions>();
 
-// Caching
 builder.Services.AddMemoryCache();
 
-// JWT Authentication
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigins", policy =>
+    {
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+            ?? new[] { "*" };
+        
+        if (allowedOrigins.Contains("*"))
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+    });
+});
+
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -80,15 +89,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Swagger
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "TenantDbService API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo 
+    { 
+        Title = "TenantDbService API", 
+        Version = "v1",
+        Description = "Multi-tenant database microservice with per-tenant isolation"
+    });
     
-    // Define the Bearer token security scheme
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.\n\nExample: \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"",
+        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.Http,
@@ -96,7 +108,6 @@ builder.Services.AddSwaggerGen(c =>
         BearerFormat = "JWT"
     });
     
-    // Apply security requirement globally to all endpoints
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -111,18 +122,8 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
-    
-    // Enable XML comments if available
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    if (File.Exists(xmlPath))
-    {
-        c.IncludeXmlComments(xmlPath);
-    }
 });
 
-// Observability
-builder.Services.AddLogging();
 var meter = new Meter("TenantDbService");
 var counter = meter.CreateCounter<long>("requests_total");
 var histogram = meter.CreateHistogram<double>("request_duration_ms");
@@ -133,7 +134,6 @@ builder.Services.AddSingleton(histogram);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -142,46 +142,43 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "TenantDbService API v1");
         c.RoutePrefix = "swagger";
         c.DisplayRequestDuration();
-        c.EnablePersistAuthorization(); // Persist authorization across page refreshes
+        c.EnablePersistAuthorization();
         c.EnableDeepLinking();
         c.EnableFilter();
-        c.ShowExtensions();
-        c.EnableValidator();
     });
 }
 
+app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 app.UseHttpsRedirection();
-
-// Global exception handler
-app.UseExceptionHandler("/error");
-
-// Tenant resolution middleware (before authentication to extract tenantId from JWT)
-// This allows tenant resolution even if JWT validation fails
+app.UseCors("AllowSpecificOrigins");
 app.UseMiddleware<TenantResolutionMiddleware>();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Health endpoints
-app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }))
+    .WithName("HealthLive")
+    .WithTags("Health");
 
 app.MapGet("/health/ready", async (CatalogDbContext catalogDb, HttpContext context) =>
 {
     try
     {
-        // Check catalog database
         await catalogDb.Database.CanConnectAsync();
         
-        // If tenant context exists, check tenant databases
-        if (context.Items.TryGetValue("tenant.ctx", out var tenantCtxObj) && 
+        if (context.Items.TryGetValue(Constants.HttpItems.TenantContext, out var tenantCtxObj) && 
             tenantCtxObj is TenantContext tenantCtx)
         {
-            // Check SQL Server connection
             var sqlFactory = context.RequestServices.GetRequiredService<SqlConnectionFactory>();
             using var sqlConnection = await sqlFactory.CreateConnectionAsync();
             await sqlConnection.OpenAsync();
             
-            // Check MongoDB connection
             var mongoFactory = context.RequestServices.GetRequiredService<IMongoDbFactory>();
             var mongoDb = await mongoFactory.GetDatabaseAsync();
             await mongoDb.RunCommandAsync<MongoDB.Bson.BsonDocument>(new MongoDB.Bson.BsonDocument("ping", 1));
@@ -189,49 +186,51 @@ app.MapGet("/health/ready", async (CatalogDbContext catalogDb, HttpContext conte
         
         return Results.Ok(new { status = "ready" });
     }
-    catch (Exception ex)
+    catch
     {
         return Results.StatusCode(503);
     }
-});
+})
+.WithName("HealthReady")
+.WithTags("Health");
 
-// Auth endpoints
 app.MapPost("/auth/dev-token", (JwtExtensions jwtExtensions, [FromBody] DevTokenRequest request) =>
 {
     if (string.IsNullOrEmpty(request.TenantId))
-        return Results.BadRequest(new { error = "TenantId is required" });
+        return Results.BadRequest(new { error = Constants.ErrorMessages.TenantIdRequired });
     
     var token = jwtExtensions.GenerateDevToken(request.TenantId);
     return Results.Ok(new { token });
 })
-.WithName("GenerateDevToken");
+.WithName("GenerateDevToken")
+.WithTags("Authentication");
 
-// Tenant management endpoints
 app.MapPost("/tenants", async (ProvisioningService provisioningService, [FromBody] CreateTenantRequest request) =>
 {
     if (string.IsNullOrEmpty(request.Name))
-        return Results.BadRequest(new { error = "Name is required" });
+        return Results.BadRequest(new { error = Constants.ErrorMessages.TenantNameRequired });
     
     var tenantId = await provisioningService.CreateTenantAsync(request.Name, request.SchemaDefinition);
     return Results.Ok(new { tenantId });
 })
-.WithName("CreateTenant");
+.WithName("CreateTenant")
+.WithTags("Tenant Management");
 
 app.MapGet("/tenants", async (ICatalogRepository catalogRepository) =>
 {
     var tenants = await catalogRepository.GetAllTenantsAsync();
     return Results.Ok(tenants);
 })
-.WithName("ListTenants");
+.WithName("ListTenants")
+.WithTags("Tenant Management");
 
-// Schema management endpoints
 app.MapPost("/tenants/{tenantId}/schema", async (ProvisioningService provisioningService, string tenantId, [FromBody] UpdateSchemaRequest request) =>
 {
     try
     {
         var schemaDefinition = System.Text.Json.JsonSerializer.Deserialize<SchemaDefinition>(request.SchemaDefinition);
         if (schemaDefinition == null)
-            return Results.BadRequest(new { error = "Invalid schema definition" });
+            return Results.BadRequest(new { error = Constants.ErrorMessages.InvalidSchemaDefinition });
         
         await provisioningService.UpdateSchemaAsync(tenantId, schemaDefinition);
         return Results.Ok(new { message = "Schema updated successfully" });
@@ -242,7 +241,8 @@ app.MapPost("/tenants/{tenantId}/schema", async (ProvisioningService provisionin
     }
 })
 .RequireAuthorization()
-.WithName("UpdateTenantSchema");
+.WithName("UpdateTenantSchema")
+.WithTags("Schema Management");
 
 app.MapGet("/tenants/{tenantId}/schema", async (ICatalogRepository catalogRepository, string tenantId) =>
 {
@@ -253,55 +253,43 @@ app.MapGet("/tenants/{tenantId}/schema", async (ICatalogRepository catalogReposi
     return Results.Ok(schema);
 })
 .RequireAuthorization()
-.WithName("GetTenantSchema");
+.WithName("GetTenantSchema")
+.WithTags("Schema Management");
 
 app.MapPost("/schema/validate", (DynamicSchemaService schemaService, [FromBody] SchemaValidationRequest request) =>
 {
     var validation = schemaService.ValidateSchema(request.SchemaDefinition);
     return Results.Ok(new SchemaValidationResponse(validation.IsValid, validation.Errors));
 })
-.WithName("ValidateSchema");
+.WithName("ValidateSchema")
+.WithTags("Schema Management");
 
-// Create a single table endpoint
 app.MapPost("/api/data/tables/create", async (DynamicSchemaService schemaService, SqlConnectionFactory sqlFactory, [FromBody] TableDefinition tableDefinition) =>
 {
     try
     {
-        // Validate table definition
         if (string.IsNullOrWhiteSpace(tableDefinition.Name))
-        {
             return Results.BadRequest(new { error = "Table name is required" });
-        }
 
         if (tableDefinition.Columns == null || !tableDefinition.Columns.Any())
-        {
             return Results.BadRequest(new { error = "Table must have at least one column" });
-        }
 
-        // Check if at least one column is a primary key
         if (!tableDefinition.Columns.Any(c => c.IsPrimaryKey))
-        {
             return Results.BadRequest(new { error = "Table must have at least one primary key column" });
-        }
 
-        // Validate the table definition
         var tempSchema = new SchemaDefinition
         {
-            Version = "1.0",
+            Version = Constants.SchemaDefaults.DefaultVersion,
             Name = "Temp Schema",
             Tables = new List<TableDefinition> { tableDefinition }
         };
         
         var validation = schemaService.ValidateSchema(tempSchema);
         if (!validation.IsValid)
-        {
-            return Results.BadRequest(new { error = "Invalid table definition", errors = validation.Errors });
-        }
+            return Results.BadRequest(new { error = Constants.ErrorMessages.InvalidSchemaDefinition, errors = validation.Errors });
 
-        // Create the table
         using var connection = await sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();
-        
         await schemaService.CreateTableAsync(connection, tableDefinition);
         
         return Results.Ok(new { message = $"Table '{tableDefinition.Name}' created successfully" });
@@ -315,7 +303,6 @@ app.MapPost("/api/data/tables/create", async (DynamicSchemaService schemaService
 .WithTags("SQL Server - Dynamic Tables")
 .WithName("CreateTable");
 
-// Dynamic data access endpoints - SQL Server
 app.MapGet("/api/data/tables", async (DynamicDataService dataService) =>
 {
     var tables = await dataService.GetTableNamesAsync();
@@ -510,30 +497,21 @@ app.MapPost("/api/events", async (EventsRepository eventsRepository, [FromBody] 
 .WithTags("MongoDB - Events")
 .WithName("CreateEvent");
 
-// Initialize database and seed data on first run
 using (var scope = app.Services.CreateScope())
 {
     var catalogDbContext = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
     var catalogRepository = scope.ServiceProvider.GetRequiredService<ICatalogRepository>();
     var provisioningService = scope.ServiceProvider.GetRequiredService<ProvisioningService>();
-    var ordersRepository = scope.ServiceProvider.GetRequiredService<OrdersRepository>();
-    var eventsRepository = scope.ServiceProvider.GetRequiredService<EventsRepository>();
     
     try
     {
-        // Ensure database is created
         await catalogDbContext.Database.EnsureCreatedAsync();
         app.Logger.LogInformation("Catalog database initialized successfully");
         
-        // Check if catalog is empty
         var existingTenants = await catalogRepository.GetAllTenantsAsync();
         if (!existingTenants.Any())
         {
-            // Create demo tenant
             var demoTenantId = await provisioningService.CreateTenantAsync("demo-tenant");
-            
-            // Create sample data (this would normally be done in a separate service)
-            // For now, we'll just log that seeding is complete
             app.Logger.LogInformation("Demo tenant created with ID: {TenantId}", demoTenantId);
         }
     }

@@ -37,12 +37,11 @@ public class DynamicSchemaService
         _logger.LogInformation("Schema creation completed for: {SchemaName}", schema.Name);
     }
 
-    private async Task CreateTableAsync(SqlConnection connection, TableDefinition table)
+    public async Task CreateTableAsync(System.Data.IDbConnection connection, TableDefinition table)
     {
         var createTableSql = GenerateCreateTableSql(table);
         await connection.ExecuteAsync(createTableSql);
         
-        // Create indexes
         foreach (var index in table.Indexes)
         {
             var createIndexSql = GenerateCreateIndexSql(table.Name, index);
@@ -182,15 +181,22 @@ public class DynamicSchemaService
     private async Task CreateMongoCollectionAsync(IMongoDatabase database, CollectionDefinition collection)
     {
         var collectionName = collection.Name;
+        
+        var existingCollections = await (await database.ListCollectionNamesAsync()).ToListAsync();
+        if (!existingCollections.Contains(collectionName))
+        {
+            await database.CreateCollectionAsync(collectionName);
+            _logger.LogDebug("Explicitly created MongoDB collection: {CollectionName}", collectionName);
+        }
+        
         var mongoCollection = database.GetCollection<MongoDB.Bson.BsonDocument>(collectionName);
 
-        // Create indexes
         foreach (var index in collection.Indexes)
         {
             await CreateMongoIndexAsync(mongoCollection, index);
         }
 
-        _logger.LogDebug("Created MongoDB collection: {CollectionName}", collectionName);
+        _logger.LogDebug("Created MongoDB collection with indexes: {CollectionName}", collectionName);
     }
 
     private async Task CreateMongoIndexAsync(IMongoCollection<MongoDB.Bson.BsonDocument> collection, IndexDefinition index)

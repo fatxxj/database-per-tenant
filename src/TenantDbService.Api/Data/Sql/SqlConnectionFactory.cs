@@ -21,10 +21,10 @@ public class SqlConnectionFactory
     public async Task<SqlConnection> CreateConnectionAsync()
     {
         var context = _httpContextAccessor.HttpContext;
-        if (context?.Items.TryGetValue("tenant.ctx", out var tenantCtxObj) != true || 
+        if (context?.Items.TryGetValue(Constants.HttpItems.TenantContext, out var tenantCtxObj) != true || 
             tenantCtxObj is not TenantContext tenantCtx)
         {
-            throw new InvalidOperationException("Tenant context not found");
+            throw new InvalidOperationException(Constants.ErrorMessages.TenantContextNotFound);
         }
 
         var connectionString = tenantCtx.Connections.SqlServerConnectionString;

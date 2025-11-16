@@ -23,7 +23,7 @@ public class OrdersRepository
         _logger = logger;
     }
 
-    public virtual async Task<List<Order>> GetOrdersAsync()
+    public async Task<List<Order>> GetOrdersAsync()
     {
         using var connection = await _sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();
@@ -38,7 +38,7 @@ public class OrdersRepository
         return orders.ToList();
     }
 
-    public virtual async Task<Order?> GetOrderByIdAsync(string id)
+    public async Task<Order?> GetOrderByIdAsync(string id)
     {
         using var connection = await _sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();
@@ -52,7 +52,7 @@ public class OrdersRepository
         return order;
     }
 
-    public virtual async Task<Order> CreateOrderAsync(string code, decimal amount)
+    public async Task<Order> CreateOrderAsync(string code, decimal amount)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -81,7 +81,7 @@ public class OrdersRepository
         return order;
     }
 
-    public virtual async Task<bool> DeleteOrderAsync(string id)
+    public async Task<bool> DeleteOrderAsync(string id)
     {
         using var connection = await _sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();
@@ -92,7 +92,7 @@ public class OrdersRepository
         return rowsAffected > 0;
     }
 
-    public virtual async Task<List<Order>> GetOrdersByCodeAsync(string code)
+    public async Task<List<Order>> GetOrdersByCodeAsync(string code)
     {
         using var connection = await _sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();

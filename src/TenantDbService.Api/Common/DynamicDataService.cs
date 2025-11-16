@@ -34,24 +34,35 @@ public class DynamicDataService
         using var connection = await _sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();
 
-        var sql = $"SELECT * FROM [{tableName}]";
-        
-        if (!string.IsNullOrEmpty(whereClause))
-        {
-            sql += $" WHERE {whereClause}";
-        }
+        whereClause = QuerySanitizer.SanitizeWhereClause(whereClause);
+        orderBy = QuerySanitizer.SanitizeOrderBy(orderBy);
+        var safeLimit = QuerySanitizer.ValidateLimit(limit);
+
+        var sql = new System.Text.StringBuilder();
         
         if (!string.IsNullOrEmpty(orderBy))
         {
-            sql += $" ORDER BY {orderBy}";
+            sql.Append($"SELECT * FROM [{tableName}]");
+            
+            if (!string.IsNullOrEmpty(whereClause))
+            {
+                sql.Append($" WHERE {whereClause}");
+            }
+            
+            sql.Append($" ORDER BY {orderBy}");
+            sql.Append($" OFFSET 0 ROWS FETCH NEXT {safeLimit} ROWS ONLY");
         }
-        
-        if (limit.HasValue)
+        else
         {
-            sql += $" OFFSET 0 ROWS FETCH NEXT {limit} ROWS ONLY";
+            sql.Append($"SELECT TOP ({safeLimit}) * FROM [{tableName}]");
+            
+            if (!string.IsNullOrEmpty(whereClause))
+            {
+                sql.Append($" WHERE {whereClause}");
+            }
         }
 
-        var results = await connection.QueryAsync(sql);
+        var results = await connection.QueryAsync(sql.ToString());
         return results.Select(r => DapperRowToDictionary(r)).Cast<Dictionary<string, object>>().ToList();
     }
 
@@ -73,7 +84,6 @@ public class DynamicDataService
         using var connection = await _sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();
 
-        // Validate table name to prevent SQL injection
         if (string.IsNullOrWhiteSpace(tableName))
         {
             _logger.LogError("Table name is null or empty");
@@ -83,31 +93,26 @@ public class DynamicDataService
         if (!IsValidIdentifier(tableName))
         {
             _logger.LogError("Invalid table name format: '{TableName}'", tableName);
-            throw new ArgumentException($"Invalid table name format: '{tableName}'. Table names must be valid SQL identifiers.", nameof(tableName));
+            throw new ArgumentException(string.Format(Constants.ErrorMessages.InvalidTableName, tableName), nameof(tableName));
         }
 
-        // Verify table exists
         var tableExists = await TableExistsAsync(connection, tableName);
         if (!tableExists)
         {
             _logger.LogError("Table '{TableName}' does not exist in the database", tableName);
-            
-            // List available tables for better error message
             var availableTables = await GetTableNamesAsync();
             _logger.LogInformation("Available tables: {Tables}", string.Join(", ", availableTables));
-            
-            throw new ArgumentException($"Table '{tableName}' does not exist. Available tables: {string.Join(", ", availableTables)}", nameof(tableName));
+            throw new ArgumentException(string.Format(Constants.ErrorMessages.TableNotFound, tableName) + 
+                $". Available tables: {string.Join(", ", availableTables)}", nameof(tableName));
         }
 
-        // Convert JsonElement values to proper C# types
         var convertedData = ConvertJsonElements(data);
 
-        // Validate column names
         foreach (var column in convertedData.Keys)
         {
             if (!IsValidIdentifier(column))
             {
-                throw new ArgumentException($"Invalid column name: {column}", nameof(data));
+                throw new ArgumentException(string.Format(Constants.ErrorMessages.InvalidColumnName, column), nameof(data));
             }
         }
 
@@ -129,7 +134,6 @@ public class DynamicDataService
         using var connection = await _sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();
 
-        // Convert JsonElement values to proper C# types
         var convertedData = ConvertJsonElements(data);
 
         var setClause = string.Join(", ", convertedData.Keys.Select(k => $"[{k}] = @{k}"));
@@ -211,9 +215,17 @@ public class DynamicDataService
         var collection = database.GetCollection<MongoDB.Bson.BsonDocument>(collectionName);
 
         var filter = Builders<MongoDB.Bson.BsonDocument>.Filter.Eq("_id", id);
-        var update = Builders<MongoDB.Bson.BsonDocument>.Update.Set("$set", DictionaryToBsonDocument(data));
         
-        var result = await collection.UpdateOneAsync(filter, update);
+        var updateBuilder = Builders<MongoDB.Bson.BsonDocument>.Update;
+        var updates = new List<UpdateDefinition<MongoDB.Bson.BsonDocument>>();
+        
+        foreach (var kvp in data)
+        {
+            updates.Add(updateBuilder.Set(kvp.Key, ObjectToBsonValue(kvp.Value)));
+        }
+        
+        var combinedUpdate = updateBuilder.Combine(updates);
+        var result = await collection.UpdateOneAsync(filter, combinedUpdate);
         
         return result.ModifiedCount > 0;
     }
@@ -274,7 +286,6 @@ public class DynamicDataService
         return await collections.ToListAsync();
     }
 
-    // Utility methods
     private Dictionary<string, object> DapperRowToDictionary(dynamic dapperRow)
     {
         var result = new Dictionary<string, object>();
@@ -399,20 +410,16 @@ public class DynamicDataService
         return result;
     }
 
-    // Security validation methods
     private static bool IsValidIdentifier(string identifier)
     {
         if (string.IsNullOrWhiteSpace(identifier))
             return false;
         
-        // SQL Server identifiers: letters, digits, _, @, #, $ (but not starting with @, #, $)
-        // Allow brackets for quoted identifiers
         return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_@#$]*$|^\[[a-zA-Z_][a-zA-Z0-9_@#$]*\]$");
     }
 
     private static string SanitizeIdentifier(string identifier)
     {
-        // Remove brackets if present, then re-add them safely
         var clean = identifier.Trim('[', ']');
         return $"[{clean}]";
     }

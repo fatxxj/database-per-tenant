@@ -11,9 +11,6 @@ public class CatalogRepository : ICatalogRepository
     private readonly CatalogDbContext _context;
     private readonly IMemoryCache _cache;
     private readonly ILogger<CatalogRepository> _logger;
-    private const string ConnectionCacheKey = "tenant_connections_{0}";
-    private const string SchemaCacheKey = "tenant_schema_{0}";
-    private const int CacheTtlMinutes = 5;
 
     public CatalogRepository(CatalogDbContext context, IMemoryCache cache, ILogger<CatalogRepository> logger)
     {
@@ -24,7 +21,7 @@ public class CatalogRepository : ICatalogRepository
 
     public async Task<TenantConnections?> GetConnectionsAsync(string tenantId)
     {
-        var cacheKey = string.Format(ConnectionCacheKey, tenantId);
+        var cacheKey = string.Format(Constants.Cache.TenantConnectionsKeyFormat, tenantId);
         
         if (_cache.TryGetValue(cacheKey, out TenantConnections? cachedConnections))
         {
@@ -33,13 +30,13 @@ public class CatalogRepository : ICatalogRepository
         }
 
         var connections = await _context.TenantConnections
-            .FirstOrDefaultAsync(tc => tc.TenantId == tenantId && tc.Tenant!.Status == "active");
+            .FirstOrDefaultAsync(tc => tc.TenantId == tenantId && tc.Tenant!.Status == Constants.TenantStatus.Active);
 
         if (connections != null)
         {
             var cacheOptions = new MemoryCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(CacheTtlMinutes)
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(Constants.Cache.DefaultTtlMinutes)
             };
             _cache.Set(cacheKey, connections, cacheOptions);
             _logger.LogDebug("Cached tenant connections: {TenantId}", tenantId);
@@ -51,7 +48,7 @@ public class CatalogRepository : ICatalogRepository
     public async Task<bool> TenantExistsAsync(string tenantId)
     {
         return await _context.Tenants
-            .AnyAsync(t => t.Id == tenantId && t.Status == "active");
+            .AnyAsync(t => t.Id == tenantId && t.Status == Constants.TenantStatus.Active);
     }
 
     public async Task CreateTenantAsync(Tenant tenant, TenantConnections connections)
@@ -68,8 +65,7 @@ public class CatalogRepository : ICatalogRepository
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 
-                // Invalidate cache
-                var cacheKey = string.Format(ConnectionCacheKey, tenant.Id);
+                var cacheKey = string.Format(Constants.Cache.TenantConnectionsKeyFormat, tenant.Id);
                 _cache.Remove(cacheKey);
                 
                 _logger.LogInformation("Created tenant: {TenantId} with name: {TenantName}", tenant.Id, tenant.Name);
@@ -85,7 +81,7 @@ public class CatalogRepository : ICatalogRepository
     public async Task<List<TenantInfo>> GetAllTenantsAsync()
     {
         return await _context.Tenants
-            .Where(t => t.Status == "active")
+            .Where(t => t.Status == Constants.TenantStatus.Active)
             .Select(t => new TenantInfo(t.Id, t.Name, t.Status, t.CreatedAt))
             .ToListAsync();
     }
@@ -96,11 +92,10 @@ public class CatalogRepository : ICatalogRepository
         if (tenant == null)
             return false;
 
-        tenant.Status = "disabled";
+        tenant.Status = Constants.TenantStatus.Disabled;
         await _context.SaveChangesAsync();
         
-        // Invalidate cache
-        var cacheKey = string.Format(ConnectionCacheKey, tenantId);
+        var cacheKey = string.Format(Constants.Cache.TenantConnectionsKeyFormat, tenantId);
         _cache.Remove(cacheKey);
         
         _logger.LogInformation("Disabled tenant: {TenantId}", tenantId);
@@ -110,13 +105,12 @@ public class CatalogRepository : ICatalogRepository
     public async Task<bool> TenantNameExistsAsync(string name)
     {
         return await _context.Tenants
-            .AnyAsync(t => t.Name == name && t.Status == "active");
+            .AnyAsync(t => t.Name == name && t.Status == Constants.TenantStatus.Active);
     }
 
-    // Schema-related methods
     public async Task<SchemaDefinition?> GetSchemaAsync(string tenantId)
     {
-        var cacheKey = string.Format(SchemaCacheKey, tenantId);
+        var cacheKey = string.Format(Constants.Cache.TenantSchemaKeyFormat, tenantId);
         
         if (_cache.TryGetValue(cacheKey, out SchemaDefinition? cachedSchema))
         {
@@ -125,7 +119,7 @@ public class CatalogRepository : ICatalogRepository
         }
 
         var tenant = await _context.Tenants
-            .FirstOrDefaultAsync(t => t.Id == tenantId && t.Status == "active");
+            .FirstOrDefaultAsync(t => t.Id == tenantId && t.Status == Constants.TenantStatus.Active);
 
         if (tenant?.SchemaDefinition == null)
             return null;
@@ -138,7 +132,7 @@ public class CatalogRepository : ICatalogRepository
             {
                 var cacheOptions = new MemoryCacheEntryOptions
                 {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(CacheTtlMinutes)
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(Constants.Cache.DefaultTtlMinutes)
                 };
                 _cache.Set(cacheKey, schema, cacheOptions);
                 _logger.LogDebug("Cached tenant schema: {TenantId}", tenantId);
@@ -165,8 +159,7 @@ public class CatalogRepository : ICatalogRepository
 
         await _context.SaveChangesAsync();
 
-        // Invalidate cache
-        var cacheKey = string.Format(SchemaCacheKey, tenantId);
+        var cacheKey = string.Format(Constants.Cache.TenantSchemaKeyFormat, tenantId);
         _cache.Remove(cacheKey);
 
         _logger.LogInformation("Updated schema for tenant: {TenantId}, version: {Version}", tenantId, schema.Version);
@@ -176,6 +169,6 @@ public class CatalogRepository : ICatalogRepository
     {
         return await _context.Tenants
             .Include(t => t.Connections)
-            .FirstOrDefaultAsync(t => t.Id == tenantId && t.Status == "active");
+            .FirstOrDefaultAsync(t => t.Id == tenantId && t.Status == Constants.TenantStatus.Active);
     }
 }

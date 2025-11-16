@@ -19,10 +19,10 @@ public class MongoDbFactory : IMongoDbFactory
     public async Task<IMongoDatabase> GetDatabaseAsync()
     {
         var context = _httpContextAccessor.HttpContext;
-        if (context?.Items.TryGetValue("tenant.ctx", out var tenantCtxObj) != true || 
+        if (context?.Items.TryGetValue(Constants.HttpItems.TenantContext, out var tenantCtxObj) != true || 
             tenantCtxObj is not TenantContext tenantCtx)
         {
-            throw new InvalidOperationException("Tenant context not found");
+            throw new InvalidOperationException(Constants.ErrorMessages.TenantContextNotFound);
         }
 
         var client = new MongoClient(tenantCtx.Connections.MongoDbConnectionString);

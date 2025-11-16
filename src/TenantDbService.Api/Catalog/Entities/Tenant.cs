@@ -14,13 +14,12 @@ public class Tenant
     
     [Required]
     [StringLength(20)]
-    public string Status { get; set; } = "active";
+    public string Status { get; set; } = Common.Constants.TenantStatus.Active;
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
-    // Schema configuration for dynamic table creation
     [StringLength(50)]
-    public string SchemaVersion { get; set; } = "1.0";
+    public string SchemaVersion { get; set; } = Common.Constants.SchemaDefaults.DefaultVersion;
     
     public string? SchemaDefinition { get; set; } // JSON schema definition
     

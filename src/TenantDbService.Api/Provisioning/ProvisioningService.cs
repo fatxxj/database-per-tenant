@@ -43,38 +43,32 @@ public class ProvisioningService
     public async Task<string> CreateTenantAsync(string name, SchemaDefinition? schemaDefinition = null)
     {
         if (string.IsNullOrEmpty(name))
-            throw new ArgumentException("Tenant name is required", nameof(name));
+            throw new ArgumentException(Constants.ErrorMessages.TenantNameRequired, nameof(name));
 
-        // Check if tenant name already exists
         if (await _catalogRepository.TenantNameExistsAsync(name))
-            throw new InvalidOperationException($"Tenant with name '{name}' already exists");
+            throw new InvalidOperationException(string.Format(Constants.ErrorMessages.TenantAlreadyExists, name));
 
-        // Validate schema if provided
         if (schemaDefinition != null)
         {
             var validation = _schemaService.ValidateSchema(schemaDefinition);
             if (!validation.IsValid)
             {
-                throw new ArgumentException($"Invalid schema: {string.Join(", ", validation.Errors)}");
+                throw new ArgumentException($"{Constants.ErrorMessages.InvalidSchemaDefinition}: {string.Join(", ", validation.Errors)}");
             }
         }
 
-        // Generate tenant ID
-        var tenantId = GenerateTenantId();
-        
-        // Create connection strings
+        var tenantId = await GenerateUniqueTenantIdAsync();
         var sqlConnectionString = _sqlSettings.Template.Replace("{TENANTID}", tenantId);
         var mongoConnectionString = _mongoSettings.Template;
         var mongoDatabaseName = _mongoSettings.DatabaseTemplate.Replace("{TENANTID}", tenantId);
 
-        // Create tenant entities
         var tenant = new Tenant
         {
             Id = tenantId,
             Name = name,
-            Status = "active",
+            Status = Constants.TenantStatus.Active,
             CreatedAt = DateTime.UtcNow,
-            SchemaVersion = schemaDefinition?.Version ?? "1.0",
+            SchemaVersion = schemaDefinition?.Version ?? Constants.SchemaDefaults.DefaultVersion,
             SchemaDefinition = schemaDefinition != null ? System.Text.Json.JsonSerializer.Serialize(schemaDefinition) : null,
             SchemaUpdatedAt = schemaDefinition != null ? DateTime.UtcNow : null
         };
@@ -88,28 +82,41 @@ public class ProvisioningService
             CreatedAt = DateTime.UtcNow
         };
 
-        // Provision databases
-        await ProvisionSqlServerDatabaseAsync(tenantId);
-        await ProvisionMongoDatabaseAsync(tenantId, mongoDatabaseName);
-
-        // Ensure default SQL schema when no dynamic schema is provided
-        if (schemaDefinition == null)
+        try
         {
-            await EnsureDefaultSqlSchemaAsync(tenantId);
-        }
+            await _catalogRepository.CreateTenantAsync(tenant, connections);
+            
+            await ProvisionSqlServerDatabaseAsync(tenantId);
+            await ProvisionMongoDatabaseAsync(tenantId, mongoDatabaseName);
 
-        // Create dynamic schema if provided
-        if (schemaDefinition != null)
+            if (schemaDefinition == null)
+            {
+                await EnsureDefaultSqlSchemaAsync(tenantId);
+            }
+            else
+            {
+                await CreateDynamicSchemaAsync(tenantId, schemaDefinition);
+            }
+
+            _logger.LogInformation("Successfully created tenant: {TenantId} with name: {TenantName}", tenantId, name);
+            return tenantId;
+        }
+        catch (Exception ex)
         {
-            await CreateDynamicSchemaAsync(tenantId, schemaDefinition);
+            _logger.LogError(ex, "Failed to create tenant: {TenantId}. Attempting rollback...", tenantId);
+            
+            try
+            {
+                await _catalogRepository.DisableTenantAsync(tenantId);
+                await CleanupDatabasesAsync(tenantId, mongoDatabaseName);
+            }
+            catch (Exception rollbackEx)
+            {
+                _logger.LogError(rollbackEx, "Rollback failed for tenant: {TenantId}. Manual cleanup may be required", tenantId);
+            }
+            
+            throw;
         }
-
-        // Store in catalog
-        await _catalogRepository.CreateTenantAsync(tenant, connections);
-
-        _logger.LogInformation("Successfully created tenant: {TenantId} with name: {TenantName}", tenantId, name);
-        
-        return tenantId;
     }
 
     public async Task<bool> DisableTenantAsync(string tenantId)
@@ -119,24 +126,19 @@ public class ProvisioningService
 
     public async Task UpdateSchemaAsync(string tenantId, SchemaDefinition schemaDefinition)
     {
-        // Validate schema
         var validation = _schemaService.ValidateSchema(schemaDefinition);
         if (!validation.IsValid)
         {
-            throw new ArgumentException($"Invalid schema: {string.Join(", ", validation.Errors)}");
+            throw new ArgumentException($"{Constants.ErrorMessages.InvalidSchemaDefinition}: {string.Join(", ", validation.Errors)}");
         }
 
-        // Check if tenant exists
         var tenant = await _catalogRepository.GetTenantAsync(tenantId);
         if (tenant == null)
         {
-            throw new ArgumentException($"Tenant not found: {tenantId}");
+            throw new ArgumentException(string.Format(Constants.ErrorMessages.TenantNotFound, tenantId));
         }
 
-        // Update schema in catalog
         await _catalogRepository.UpdateSchemaAsync(tenantId, schemaDefinition);
-
-        // Apply schema changes to databases
         await ApplySchemaChangesAsync(tenantId, schemaDefinition);
 
         _logger.LogInformation("Successfully updated schema for tenant: {TenantId}", tenantId);
@@ -146,12 +148,10 @@ public class ProvisioningService
     {
         try
         {
-            // Create SQL Server schema
             using var sqlConnection = new Microsoft.Data.SqlClient.SqlConnection(_sqlSettings.Template.Replace("{TENANTID}", tenantId));
             await sqlConnection.OpenAsync();
             await _schemaService.CreateSchemaAsync(sqlConnection, schemaDefinition);
 
-            // Create MongoDB collections
             var mongoClient = new MongoClient(_mongoSettings.Template);
             var databaseName = _mongoSettings.DatabaseTemplate.Replace("{TENANTID}", tenantId);
             var database = mongoClient.GetDatabase(databaseName);
@@ -170,13 +170,8 @@ public class ProvisioningService
     {
         try
         {
-            // Get current schema for comparison (if needed for migrations)
             var currentSchema = await _catalogRepository.GetSchemaAsync(tenantId);
-            
-            // For now, we'll recreate the schema
-            // In a production system, you'd want to implement proper schema migration
             await CreateDynamicSchemaAsync(tenantId, schemaDefinition);
-
             _logger.LogInformation("Schema changes applied for tenant: {TenantId}", tenantId);
         }
         catch (Exception ex)
@@ -280,14 +275,71 @@ END";
         }
     }
 
+    private async Task<string> GenerateUniqueTenantIdAsync()
+    {
+        const int maxAttempts = 10;
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            var tenantId = GenerateTenantId();
+            
+            if (!await _catalogRepository.TenantExistsAsync(tenantId))
+            {
+                return tenantId;
+            }
+            
+            _logger.LogWarning("Tenant ID collision detected: {TenantId}. Regenerating... (Attempt {Attempt}/{MaxAttempts})", 
+                tenantId, attempt + 1, maxAttempts);
+        }
+        
+        throw new InvalidOperationException("Failed to generate unique tenant ID after multiple attempts");
+    }
+
     private static string GenerateTenantId()
     {
-        // Generate 12-16 character lowercase alphanumeric ID
         const string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        var random = new Random();
-        var length = random.Next(12, 17);
+        const int length = 16;
+        var result = new char[length];
         
-        return new string(Enumerable.Repeat(chars, length)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        var bytes = new byte[length];
+        rng.GetBytes(bytes);
+        
+        for (int i = 0; i < length; i++)
+        {
+            result[i] = chars[bytes[i] % chars.Length];
+        }
+        
+        return new string(result);
+    }
+
+    private async Task CleanupDatabasesAsync(string tenantId, string mongoDatabaseName)
+    {
+        try
+        {
+            var masterConnectionString = _sqlSettings.Template.Replace("Database=tenant_{TENANTID}", "Database=master");
+            using var masterConnection = new Microsoft.Data.SqlClient.SqlConnection(masterConnectionString);
+            await masterConnection.OpenAsync();
+            
+            var databaseName = $"tenant_{tenantId}";
+            var dropDbQuery = $"IF EXISTS (SELECT * FROM sys.databases WHERE name = '{databaseName}') DROP DATABASE [{databaseName}]";
+            await masterConnection.ExecuteAsync(dropDbQuery);
+            
+            _logger.LogInformation("Cleaned up SQL Server database: {DatabaseName}", databaseName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to cleanup SQL Server database for tenant: {TenantId}", tenantId);
+        }
+
+        try
+        {
+            var client = new MongoClient(_mongoSettings.Template);
+            await client.DropDatabaseAsync(mongoDatabaseName);
+            _logger.LogInformation("Cleaned up MongoDB database: {DatabaseName}", mongoDatabaseName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to cleanup MongoDB database for tenant: {TenantId}", tenantId);
+        }
     }
 }
