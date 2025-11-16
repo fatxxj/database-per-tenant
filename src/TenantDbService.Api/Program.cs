@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.IO;
 using System.Text;
 using TenantDbService.Api.Auth;
 using TenantDbService.Api.Catalog;
@@ -83,14 +84,19 @@ builder.Services.AddAuthorization();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "TenantDbService API", Version = "v1" });
+    
+    // Define the Bearer token security scheme
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme",
+        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.\n\nExample: \"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"",
         Name = "Authorization",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
     });
+    
+    // Apply security requirement globally to all endpoints
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -105,6 +111,14 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+    
+    // Enable XML comments if available
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
 });
 
 // Observability
@@ -123,7 +137,17 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "TenantDbService API v1");
+        c.RoutePrefix = "swagger";
+        c.DisplayRequestDuration();
+        c.EnablePersistAuthorization(); // Persist authorization across page refreshes
+        c.EnableDeepLinking();
+        c.EnableFilter();
+        c.ShowExtensions();
+        c.EnableValidator();
+    });
 }
 
 app.UseHttpsRedirection();
@@ -131,7 +155,8 @@ app.UseHttpsRedirection();
 // Global exception handler
 app.UseExceptionHandler("/error");
 
-// Tenant resolution middleware (must be early)
+// Tenant resolution middleware (before authentication to extract tenantId from JWT)
+// This allows tenant resolution even if JWT validation fails
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.UseAuthentication();
@@ -237,13 +262,67 @@ app.MapPost("/schema/validate", (DynamicSchemaService schemaService, [FromBody] 
 })
 .WithName("ValidateSchema");
 
-// Dynamic data access endpoints
+// Create a single table endpoint
+app.MapPost("/api/data/tables/create", async (DynamicSchemaService schemaService, SqlConnectionFactory sqlFactory, [FromBody] TableDefinition tableDefinition) =>
+{
+    try
+    {
+        // Validate table definition
+        if (string.IsNullOrWhiteSpace(tableDefinition.Name))
+        {
+            return Results.BadRequest(new { error = "Table name is required" });
+        }
+
+        if (tableDefinition.Columns == null || !tableDefinition.Columns.Any())
+        {
+            return Results.BadRequest(new { error = "Table must have at least one column" });
+        }
+
+        // Check if at least one column is a primary key
+        if (!tableDefinition.Columns.Any(c => c.IsPrimaryKey))
+        {
+            return Results.BadRequest(new { error = "Table must have at least one primary key column" });
+        }
+
+        // Validate the table definition
+        var tempSchema = new SchemaDefinition
+        {
+            Version = "1.0",
+            Name = "Temp Schema",
+            Tables = new List<TableDefinition> { tableDefinition }
+        };
+        
+        var validation = schemaService.ValidateSchema(tempSchema);
+        if (!validation.IsValid)
+        {
+            return Results.BadRequest(new { error = "Invalid table definition", errors = validation.Errors });
+        }
+
+        // Create the table
+        using var connection = await sqlFactory.CreateConnectionAsync();
+        await connection.OpenAsync();
+        
+        await schemaService.CreateTableAsync(connection, tableDefinition);
+        
+        return Results.Ok(new { message = $"Table '{tableDefinition.Name}' created successfully" });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.RequireAuthorization()
+.WithTags("SQL Server - Dynamic Tables")
+.WithName("CreateTable");
+
+// Dynamic data access endpoints - SQL Server
 app.MapGet("/api/data/tables", async (DynamicDataService dataService) =>
 {
     var tables = await dataService.GetTableNamesAsync();
     return Results.Ok(tables);
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Dynamic Tables")
 .WithName("GetTableNames");
 
 app.MapGet("/api/data/tables/{tableName}/schema", async (DynamicDataService dataService, string tableName) =>
@@ -252,6 +331,7 @@ app.MapGet("/api/data/tables/{tableName}/schema", async (DynamicDataService data
     return Results.Ok(schema);
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Dynamic Tables")
 .WithName("GetTableSchema");
 
 app.MapGet("/api/data/tables/{tableName}", async (DynamicDataService dataService, string tableName, string? where, string? orderBy, int? limit) =>
@@ -260,6 +340,7 @@ app.MapGet("/api/data/tables/{tableName}", async (DynamicDataService dataService
     return Results.Ok(data);
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Dynamic Tables")
 .WithName("QueryTable");
 
 app.MapGet("/api/data/tables/{tableName}/{id}", async (DynamicDataService dataService, string tableName, string id) =>
@@ -271,14 +352,18 @@ app.MapGet("/api/data/tables/{tableName}/{id}", async (DynamicDataService dataSe
     return Results.Ok(data);
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Dynamic Tables")
 .WithName("GetTableRecord");
 
-app.MapPost("/api/data/tables/{tableName}", async (DynamicDataService dataService, string tableName, [FromBody] Dictionary<string, object> data) =>
+app.MapPost("/api/data/tables/{tableName}", async (DynamicDataService dataService, string tableName, [FromBody] Dictionary<string, object> data, ILogger<Program> logger) =>
 {
+    logger.LogInformation("POST /api/data/tables/{TableName} - Received tableName: '{TableName}'", tableName, tableName);
+    
     var id = await dataService.InsertAsync(tableName, data);
     return Results.Created($"/api/data/tables/{tableName}/{id}", new { id });
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Dynamic Tables")
 .WithName("InsertTableRecord");
 
 app.MapPut("/api/data/tables/{tableName}/{id}", async (DynamicDataService dataService, string tableName, string id, [FromBody] Dictionary<string, object> data) =>
@@ -290,6 +375,7 @@ app.MapPut("/api/data/tables/{tableName}/{id}", async (DynamicDataService dataSe
     return Results.Ok(new { message = "Updated successfully" });
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Dynamic Tables")
 .WithName("UpdateTableRecord");
 
 app.MapDelete("/api/data/tables/{tableName}/{id}", async (DynamicDataService dataService, string tableName, string id) =>
@@ -301,6 +387,7 @@ app.MapDelete("/api/data/tables/{tableName}/{id}", async (DynamicDataService dat
     return Results.Ok(new { message = "Deleted successfully" });
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Dynamic Tables")
 .WithName("DeleteTableRecord");
 
 // MongoDB dynamic data access
@@ -310,6 +397,7 @@ app.MapGet("/api/data/collections", async (DynamicDataService dataService) =>
     return Results.Ok(collections);
 })
 .RequireAuthorization()
+.WithTags("MongoDB - Dynamic Collections")
 .WithName("GetCollectionNames");
 
 app.MapGet("/api/data/collections/{collectionName}", async (DynamicDataService dataService, string collectionName, string? filter, string? sort, int? limit) =>
@@ -318,6 +406,7 @@ app.MapGet("/api/data/collections/{collectionName}", async (DynamicDataService d
     return Results.Ok(data);
 })
 .RequireAuthorization()
+.WithTags("MongoDB - Dynamic Collections")
 .WithName("QueryCollection");
 
 app.MapGet("/api/data/collections/{collectionName}/{id}", async (DynamicDataService dataService, string collectionName, string id) =>
@@ -329,6 +418,7 @@ app.MapGet("/api/data/collections/{collectionName}/{id}", async (DynamicDataServ
     return Results.Ok(data);
 })
 .RequireAuthorization()
+.WithTags("MongoDB - Dynamic Collections")
 .WithName("GetCollectionRecord");
 
 app.MapPost("/api/data/collections/{collectionName}", async (DynamicDataService dataService, string collectionName, [FromBody] Dictionary<string, object> data) =>
@@ -337,6 +427,7 @@ app.MapPost("/api/data/collections/{collectionName}", async (DynamicDataService 
     return Results.Created($"/api/data/collections/{collectionName}/{id}", new { id });
 })
 .RequireAuthorization()
+.WithTags("MongoDB - Dynamic Collections")
 .WithName("InsertCollectionRecord");
 
 app.MapPut("/api/data/collections/{collectionName}/{id}", async (DynamicDataService dataService, string collectionName, string id, [FromBody] Dictionary<string, object> data) =>
@@ -348,6 +439,7 @@ app.MapPut("/api/data/collections/{collectionName}/{id}", async (DynamicDataServ
     return Results.Ok(new { message = "Updated successfully" });
 })
 .RequireAuthorization()
+.WithTags("MongoDB - Dynamic Collections")
 .WithName("UpdateCollectionRecord");
 
 app.MapDelete("/api/data/collections/{collectionName}/{id}", async (DynamicDataService dataService, string collectionName, string id) =>
@@ -359,6 +451,7 @@ app.MapDelete("/api/data/collections/{collectionName}/{id}", async (DynamicDataS
     return Results.Ok(new { message = "Deleted successfully" });
 })
 .RequireAuthorization()
+.WithTags("MongoDB - Dynamic Collections")
 .WithName("DeleteCollectionRecord");
 
 // Orders endpoints (SQL Server)
@@ -368,6 +461,7 @@ app.MapGet("/api/orders", async (OrdersRepository ordersRepository, HttpContext 
     return Results.Ok(orders);
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Orders")
 .WithName("GetOrders");
 
 app.MapPost("/api/orders", async (OrdersRepository ordersRepository, [FromBody] CreateOrderRequest request) =>
@@ -379,6 +473,7 @@ app.MapPost("/api/orders", async (OrdersRepository ordersRepository, [FromBody] 
     return Results.Created($"/api/orders/{order.Id}", order);
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Orders")
 .WithName("CreateOrder");
 
 app.MapGet("/api/orders/{id}", async (OrdersRepository ordersRepository, string id) =>
@@ -390,6 +485,7 @@ app.MapGet("/api/orders/{id}", async (OrdersRepository ordersRepository, string 
     return Results.Ok(order);
 })
 .RequireAuthorization()
+.WithTags("SQL Server - Orders")
 .WithName("GetOrderById");
 
 // Events endpoints (MongoDB)
@@ -399,6 +495,7 @@ app.MapGet("/api/events", async (EventsRepository eventsRepository, string? type
     return Results.Ok(events);
 })
 .RequireAuthorization()
+.WithTags("MongoDB - Events")
 .WithName("GetEvents");
 
 app.MapPost("/api/events", async (EventsRepository eventsRepository, [FromBody] CreateEventRequest request) =>
@@ -410,6 +507,7 @@ app.MapPost("/api/events", async (EventsRepository eventsRepository, [FromBody] 
     return Results.Created($"/api/events/{evt.Id}", evt);
 })
 .RequireAuthorization()
+.WithTags("MongoDB - Events")
 .WithName("CreateEvent");
 
 // Initialize database and seed data on first run

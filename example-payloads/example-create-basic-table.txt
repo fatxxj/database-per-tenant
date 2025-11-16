@@ -1,0 +1,45 @@
+{
+  "name": "fat",
+  "description": "fat",
+  "columns": [
+    {
+      "name": "Id",
+      "dataType": "int",
+      "isPrimaryKey": true,
+      "isNullable": false,
+      "isIdentity": true
+    },
+    {
+      "name": "Code",
+      "dataType": "nvarchar",
+      "maxLength": 50,
+      "isNullable": false
+    },
+    {
+      "name": "Amount",
+      "dataType": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "isNullable": false
+    },
+    {
+      "name": "IsActive",
+      "dataType": "bit",
+      "isNullable": false,
+      "defaultValue": "1"
+    },
+    {
+      "name": "CreatedAt",
+      "dataType": "datetime2",
+      "isNullable": false,
+      "defaultValue": "GETUTCDATE()"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "IX_fattttt_Code",
+      "columns": ["Code"],
+      "isUnique": true
+    }
+  ]
+}

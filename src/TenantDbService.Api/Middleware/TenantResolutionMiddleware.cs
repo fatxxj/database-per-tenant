@@ -89,7 +89,7 @@ public class TenantResolutionMiddleware
         await _next(context);
     }
 
-    private static string? ResolveTenantId(HttpContext context)
+    private string? ResolveTenantId(HttpContext context)
     {
         // First try to get from JWT claim
         var tenantId = GetTenantIdFromJwt(context);
@@ -97,30 +97,89 @@ public class TenantResolutionMiddleware
             return tenantId;
 
         // Fallback to header
-        return context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+        var headerTenantId = context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(headerTenantId))
+        {
+            _logger.LogDebug("Found tenantId in X-Tenant-Id header: {TenantId}", headerTenantId);
+            return headerTenantId;
+        }
+
+        return null;
     }
 
-    private static string? GetTenantIdFromJwt(HttpContext context)
+    private string? GetTenantIdFromJwt(HttpContext context)
     {
-        var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
-            return null;
+        // First, try to get from authenticated user claims (after authentication middleware)
+        if (context.User?.Identity?.IsAuthenticated == true)
+        {
+            // Try exact match first
+            var tenantIdClaim = context.User.Claims.FirstOrDefault(c => 
+                string.Equals(c.Type, "tenantId", StringComparison.OrdinalIgnoreCase));
+            
+            if (tenantIdClaim != null)
+            {
+                _logger.LogDebug("Found tenantId in authenticated user claims: {TenantId}", tenantIdClaim.Value);
+                return tenantIdClaim.Value;
+            }
+            
+            // Log all available claims for debugging
+            _logger.LogDebug("Authenticated user claims available: {Claims}", 
+                string.Join(", ", context.User.Claims.Select(c => $"{c.Type}={c.Value}")));
+        }
 
-        var token = authHeader.Substring("Bearer ".Length);
+        // Fallback: Try to parse JWT manually (before authentication middleware)
+        var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("No Authorization header found or not Bearer token");
+            return null;
+        }
+
+        var token = authHeader.Substring("Bearer ".Length).Trim();
+        
+        if (string.IsNullOrEmpty(token))
+        {
+            _logger.LogDebug("Token is empty after Bearer prefix");
+            return null;
+        }
         
         try
         {
             var handler = new JwtSecurityTokenHandler();
+            
+            // Check if token can be read
+            if (!handler.CanReadToken(token))
+            {
+                _logger.LogWarning("JWT token cannot be read. Token might be malformed.");
+                return null;
+            }
+            
             var jsonToken = handler.ReadJwtToken(token);
             
-            var tenantIdClaim = jsonToken.Claims.FirstOrDefault(c => c.Type == "tenantId");
-            return tenantIdClaim?.Value;
+            // Try multiple claim name variations (case-insensitive)
+            var tenantIdClaim = jsonToken.Claims.FirstOrDefault(c => 
+                string.Equals(c.Type, "tenantId", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(c.Type, "tenant_id", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(c.Type, "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier", StringComparison.OrdinalIgnoreCase));
+            
+            if (tenantIdClaim != null)
+            {
+                _logger.LogDebug("Found tenantId in JWT claims: {TenantId}", tenantIdClaim.Value);
+                return tenantIdClaim.Value;
+            }
+            else
+            {
+                _logger.LogWarning("JWT token parsed successfully but no tenantId claim found. Available claims: {Claims}", 
+                    string.Join(", ", jsonToken.Claims.Select(c => $"{c.Type}={c.Value}")));
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Token parsing failed, ignore
+            _logger.LogWarning(ex, "Failed to parse JWT token. Error: {ErrorMessage}", ex.Message);
             return null;
         }
+        
+        return null;
     }
 
     private static bool IsValidTenantId(string tenantId)

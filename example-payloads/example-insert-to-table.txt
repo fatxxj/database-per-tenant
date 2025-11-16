@@ -1,0 +1,7 @@
+{
+  "Code": "FAT003",
+  "Amount": 100.50,
+  "IsActive": 1
+}
+
+#Table name is Fat

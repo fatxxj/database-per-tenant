@@ -68,16 +68,55 @@ public class DynamicDataService
 
     public async Task<string> InsertAsync(string tableName, Dictionary<string, object> data)
     {
+        _logger.LogInformation("InsertAsync called with tableName: '{TableName}' (length: {Length})", tableName, tableName?.Length ?? 0);
+        
         using var connection = await _sqlFactory.CreateConnectionAsync();
         await connection.OpenAsync();
+
+        // Validate table name to prevent SQL injection
+        if (string.IsNullOrWhiteSpace(tableName))
+        {
+            _logger.LogError("Table name is null or empty");
+            throw new ArgumentException("Table name cannot be null or empty", nameof(tableName));
+        }
+
+        if (!IsValidIdentifier(tableName))
+        {
+            _logger.LogError("Invalid table name format: '{TableName}'", tableName);
+            throw new ArgumentException($"Invalid table name format: '{tableName}'. Table names must be valid SQL identifiers.", nameof(tableName));
+        }
+
+        // Verify table exists
+        var tableExists = await TableExistsAsync(connection, tableName);
+        if (!tableExists)
+        {
+            _logger.LogError("Table '{TableName}' does not exist in the database", tableName);
+            
+            // List available tables for better error message
+            var availableTables = await GetTableNamesAsync();
+            _logger.LogInformation("Available tables: {Tables}", string.Join(", ", availableTables));
+            
+            throw new ArgumentException($"Table '{tableName}' does not exist. Available tables: {string.Join(", ", availableTables)}", nameof(tableName));
+        }
 
         // Convert JsonElement values to proper C# types
         var convertedData = ConvertJsonElements(data);
 
-        var columns = convertedData.Keys.Select(k => $"[{k}]").ToList();
+        // Validate column names
+        foreach (var column in convertedData.Keys)
+        {
+            if (!IsValidIdentifier(column))
+            {
+                throw new ArgumentException($"Invalid column name: {column}", nameof(data));
+            }
+        }
+
+        var columns = convertedData.Keys.Select(k => SanitizeIdentifier(k)).ToList();
         var parameters = convertedData.Keys.Select(k => $"@{k}").ToList();
         
-        var sql = $"INSERT INTO [{tableName}] ({string.Join(", ", columns)}) VALUES ({string.Join(", ", parameters)})";
+        var sql = $"INSERT INTO {SanitizeIdentifier(tableName)} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", parameters)})";
+        
+        _logger.LogDebug("Executing INSERT: {Sql}", sql);
         
         await connection.ExecuteAsync(sql, convertedData);
         
@@ -358,5 +397,35 @@ public class DynamicDataService
         }
         
         return result;
+    }
+
+    // Security validation methods
+    private static bool IsValidIdentifier(string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+            return false;
+        
+        // SQL Server identifiers: letters, digits, _, @, #, $ (but not starting with @, #, $)
+        // Allow brackets for quoted identifiers
+        return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_@#$]*$|^\[[a-zA-Z_][a-zA-Z0-9_@#$]*\]$");
+    }
+
+    private static string SanitizeIdentifier(string identifier)
+    {
+        // Remove brackets if present, then re-add them safely
+        var clean = identifier.Trim('[', ']');
+        return $"[{clean}]";
+    }
+
+    private async Task<bool> TableExistsAsync(System.Data.IDbConnection connection, string tableName)
+    {
+        var cleanTableName = tableName.Trim('[', ']');
+        var sql = @"
+            SELECT COUNT(*) 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_NAME = @TableName AND TABLE_TYPE = 'BASE TABLE'";
+        
+        var count = await connection.ExecuteScalarAsync<int>(sql, new { TableName = cleanTableName });
+        return count > 0;
     }
 }
