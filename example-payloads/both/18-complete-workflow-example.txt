@@ -1,0 +1,197 @@
+# Complete Workflow Example
+# Step-by-step guide to using the TenantDbService API
+
+# ============================================================
+# STEP 1: Create a Tenant (SQL Server only for this example)
+# ============================================================
+
+POST /tenants
+Content-Type: application/json
+
+{
+  "name": "My SaaS Application",
+  "databaseType": 1
+}
+
+# Response:
+# {
+#   "tenantId": "abc123def456",
+#   "databaseType": "SqlServer"
+# }
+
+# Save the tenantId for later use!
+
+
+# ============================================================
+# STEP 2: Generate Authentication Token
+# ============================================================
+
+POST /auth/dev-token
+Content-Type: application/json
+
+{
+  "tenantId": "abc123def456"
+}
+
+# Response:
+# {
+#   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+# }
+
+# Save this token - use it in Authorization header for all subsequent requests!
+
+
+# ============================================================
+# STEP 3: Create a Custom Table
+# ============================================================
+
+POST /api/data/tables/create
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Tenant-Id: abc123def456
+Content-Type: application/json
+
+{
+  "name": "Products",
+  "description": "Product catalog",
+  "columns": [
+    {
+      "name": "Id",
+      "dataType": "int",
+      "isPrimaryKey": true,
+      "isNullable": false,
+      "isIdentity": true
+    },
+    {
+      "name": "SKU",
+      "dataType": "nvarchar",
+      "maxLength": 50,
+      "isNullable": false
+    },
+    {
+      "name": "Name",
+      "dataType": "nvarchar",
+      "maxLength": 200,
+      "isNullable": false
+    },
+    {
+      "name": "Price",
+      "dataType": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "isNullable": false
+    },
+    {
+      "name": "Stock",
+      "dataType": "int",
+      "isNullable": false,
+      "defaultValue": "0"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "IX_Products_SKU",
+      "columns": ["SKU"],
+      "isUnique": true
+    }
+  ]
+}
+
+
+# ============================================================
+# STEP 4: Insert Products
+# ============================================================
+
+POST /api/data/tables/Products
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Tenant-Id: abc123def456
+Content-Type: application/json
+
+{
+  "SKU": "PROD-001",
+  "Name": "Wireless Mouse",
+  "Price": 29.99,
+  "Stock": 100
+}
+
+# Insert another product:
+{
+  "SKU": "PROD-002",
+  "Name": "USB Keyboard",
+  "Price": 49.99,
+  "Stock": 75
+}
+
+
+# ============================================================
+# STEP 5: Query Products
+# ============================================================
+
+# Get all products
+GET /api/data/tables/Products
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Tenant-Id: abc123def456
+
+# Get low stock products
+GET /api/data/tables/Products?where=Stock<50&orderBy=Stock ASC
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Tenant-Id: abc123def456
+
+
+# ============================================================
+# STEP 6: Update a Product
+# ============================================================
+
+PUT /api/data/tables/Products/1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Tenant-Id: abc123def456
+Content-Type: application/json
+
+{
+  "Stock": 120,
+  "Price": 27.99
+}
+
+
+# ============================================================
+# STEP 7: Create an Order (using default Orders table)
+# ============================================================
+
+POST /api/orders
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Tenant-Id: abc123def456
+Content-Type: application/json
+
+{
+  "code": "ORD-2024-001",
+  "amount": 79.98
+}
+
+
+# ============================================================
+# STEP 8: Query Orders
+# ============================================================
+
+GET /api/orders
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Tenant-Id: abc123def456
+
+
+# ============================================================
+# STEP 9: Delete a Product
+# ============================================================
+
+DELETE /api/data/tables/Products/2
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+X-Tenant-Id: abc123def456
+
+
+# ============================================================
+# Notes:
+# ============================================================
+# - Replace token and tenantId with your actual values
+# - All protected endpoints require Authorization header
+# - X-Tenant-Id header is recommended (can also be in JWT)
+# - SQL Server tenants can only use SQL endpoints
+# - MongoDB tenants can only use MongoDB endpoints
+# - "Both" tenants can use all endpoints
+

@@ -1,0 +1,78 @@
+# List and Get Tenant Information
+
+# ============================================================
+# LIST ALL TENANTS
+# ============================================================
+# Get list of all tenants (no authentication required)
+
+GET /tenants
+
+# Response:
+# [
+#   {
+#     "id": "abc123def456",
+#     "name": "SQL Company",
+#     "status": "active",
+#     "databaseType": 1,
+#     "createdAt": "2024-11-16T10:00:00Z",
+#     "schemaVersion": "1.0"
+#   },
+#   {
+#     "id": "xyz789abc012",
+#     "name": "Mongo Company",
+#     "status": "active",
+#     "databaseType": 2,
+#     "createdAt": "2024-11-16T11:00:00Z",
+#     "schemaVersion": "1.0"
+#   },
+#   {
+#     "id": "mno345pqr678",
+#     "name": "Hybrid Company",
+#     "status": "active",
+#     "databaseType": 3,
+#     "createdAt": "2024-11-16T12:00:00Z",
+#     "schemaVersion": "1.0"
+#   }
+# ]
+
+
+# ============================================================
+# GET TENANT SCHEMA
+# ============================================================
+# Get schema definition for a specific tenant
+# Requires Authorization header
+
+GET /tenants/abc123def456/schema
+Authorization: Bearer {your-jwt-token}
+
+# Response:
+# {
+#   "version": "1.0",
+#   "name": "E-Commerce Schema",
+#   "description": "Schema for e-commerce application",
+#   "tables": [
+#     {
+#       "name": "Products",
+#       "columns": [ ... ]
+#     }
+#   ],
+#   "collections": [
+#     {
+#       "name": "product_views",
+#       "indexes": [ ... ]
+#     }
+#   ]
+# }
+
+# Response (no schema):
+# HTTP 404 Not Found
+# {
+#   "error": "Schema not found"
+# }
+
+
+# Notes:
+# - Database Type values: 1 = SqlServer, 2 = MongoDb, 3 = Both
+# - Status values: "active", "disabled"
+# - SchemaVersion tracks schema changes
+

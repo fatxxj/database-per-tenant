@@ -1,0 +1,82 @@
+# Get Specific Records by ID
+# Requires Authorization header with Bearer token
+
+# ============================================================
+# GET SPECIFIC TABLE RECORD (SQL Server)
+# ============================================================
+# Retrieve a single record by ID from a table
+
+GET /api/data/tables/Products/1
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Response:
+# {
+#   "Id": 1,
+#   "SKU": "PROD-12345",
+#   "Name": "Wireless Mouse",
+#   "Price": 29.99,
+#   "Stock": 100,
+#   "IsActive": true,
+#   "CreatedAt": "2024-11-16T10:00:00Z"
+# }
+
+# Response (not found):
+# HTTP 404 Not Found
+
+
+# ============================================================
+# GET SPECIFIC COLLECTION DOCUMENT (MongoDB)
+# ============================================================
+# Retrieve a single document by ID from a collection
+
+GET /api/data/collections/product_views/673886a5e4b0c8d9f1234567
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Response:
+# {
+#   "_id": "673886a5e4b0c8d9f1234567",
+#   "productId": "PROD-12345",
+#   "userId": "user-abc-123",
+#   "viewedAt": "2024-11-16T10:30:00Z",
+#   "sessionId": "session-xyz-789",
+#   "device": "mobile",
+#   "metadata": {
+#     "browser": "Chrome",
+#     "os": "iOS"
+#   }
+# }
+
+# Response (not found):
+# HTTP 404 Not Found
+
+
+# ============================================================
+# GET SPECIFIC ORDER (SQL Server)
+# ============================================================
+# Retrieve a specific order by ID
+
+GET /api/orders/abc-123-def-456
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Response:
+# {
+#   "id": "abc-123-def-456",
+#   "code": "ORD-2024-001",
+#   "amount": 199.99,
+#   "createdAt": "2024-11-16T10:00:00Z"
+# }
+
+# Response (not found):
+# HTTP 404 Not Found
+
+
+# Notes:
+# - ID format depends on table/collection definition
+# - SQL Server: typically int (identity) or guid
+# - MongoDB: ObjectId (24-character hex string)
+# - Returns 404 if record doesn't exist
+# - Returns full record with all fields
+

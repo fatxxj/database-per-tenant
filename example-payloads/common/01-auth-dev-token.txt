@@ -1,0 +1,12 @@
+# POST /auth/dev-token
+# Generate a development JWT token for authentication
+
+{
+  "tenantId": "abc123def456"
+}
+
+# Response:
+# {
+#   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+# }
+

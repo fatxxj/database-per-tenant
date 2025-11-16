@@ -1,0 +1,24 @@
+# POST /tenants
+# Create a tenant with both SQL Server and MongoDB databases
+
+{
+  "name": "Hybrid Company",
+  "databaseType": 3
+}
+
+# Or simply (databaseType defaults to 3):
+{
+  "name": "Hybrid Company"
+}
+
+# Response:
+# {
+#   "tenantId": "mno345pqr678",
+#   "databaseType": "Both"
+# }
+
+# Notes:
+# - databaseType: 1 = SqlServer, 2 = MongoDb, 3 = Both (default)
+# - Both databases will be provisioned
+# - Orders table created by default in SQL Server
+

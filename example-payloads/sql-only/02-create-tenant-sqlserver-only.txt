@@ -1,0 +1,19 @@
+# POST /tenants
+# Create a tenant with SQL Server database only
+
+{
+  "name": "SQL Company",
+  "databaseType": 1
+}
+
+# Response:
+# {
+#   "tenantId": "abc123def456",
+#   "databaseType": "SqlServer"
+# }
+
+# Notes:
+# - databaseType: 1 = SqlServer, 2 = MongoDb, 3 = Both (default)
+# - Only SQL Server database will be provisioned
+# - Orders table created by default
+

@@ -1,0 +1,48 @@
+# Health Check Endpoints
+# No authentication required
+
+# ============================================================
+# LIVENESS CHECK
+# ============================================================
+# Check if the service is running
+
+GET /health/live
+
+# Response:
+# {
+#   "status": "healthy"
+# }
+
+# Use this for:
+# - Kubernetes liveness probes
+# - Load balancer health checks
+# - Simple uptime monitoring
+
+
+# ============================================================
+# READINESS CHECK
+# ============================================================
+# Check if service is ready to handle requests (databases connected)
+
+GET /health/ready
+
+# Response (success):
+# {
+#   "status": "ready"
+# }
+
+# Response (not ready):
+# HTTP 503 Service Unavailable
+
+# Use this for:
+# - Kubernetes readiness probes
+# - Ensuring databases are accessible
+# - Pre-deployment validation
+
+
+# Notes:
+# - /health/live only checks if the API is running
+# - /health/ready checks catalog database connectivity
+# - Both endpoints are public (no authentication)
+# - Use these for monitoring and orchestration
+

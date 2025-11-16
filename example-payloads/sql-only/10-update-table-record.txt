@@ -1,0 +1,42 @@
+# PUT /api/data/tables/{tableName}/{id}
+# Update a record in a table
+# Requires Authorization header with Bearer token
+
+# Example 1: Update employee record
+# PUT /api/data/tables/Employees/5
+
+{
+  "Department": "Sales",
+  "Salary": 82000.00
+}
+
+# Example 2: Update product stock
+# PUT /api/data/tables/Products/12
+
+{
+  "Stock": 75,
+  "Price": 27.99
+}
+
+# Example 3: Update order
+# PUT /api/data/tables/Orders/abc123
+
+{
+  "Amount": 249.99
+}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+# Content-Type: application/json
+
+# Response:
+# {
+#   "message": "Updated successfully"
+# }
+
+# Notes:
+# - Only include fields you want to update
+# - Primary key (Id) cannot be updated
+# - Fields not included will remain unchanged
+

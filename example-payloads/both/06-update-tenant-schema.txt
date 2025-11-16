@@ -1,0 +1,61 @@
+# POST /tenants/{tenantId}/schema
+# Update schema for an existing tenant
+# Requires Authorization header with Bearer token
+
+{
+  "schemaDefinition": "{\"version\":\"2.0\",\"name\":\"Updated Schema\",\"tables\":[{\"name\":\"NewTable\",\"columns\":[{\"name\":\"Id\",\"dataType\":\"int\",\"isPrimaryKey\":true,\"isNullable\":false,\"isIdentity\":true},{\"name\":\"Name\",\"dataType\":\"nvarchar\",\"maxLength\":100,\"isNullable\":false}]}]}"
+}
+
+# Or prettified version:
+{
+  "schemaDefinition": {
+    "version": "2.0",
+    "name": "Updated Schema",
+    "description": "Updated schema with new tables",
+    "tables": [
+      {
+        "name": "Invoices",
+        "description": "Invoice records",
+        "columns": [
+          {
+            "name": "Id",
+            "dataType": "int",
+            "isPrimaryKey": true,
+            "isNullable": false,
+            "isIdentity": true
+          },
+          {
+            "name": "InvoiceNumber",
+            "dataType": "nvarchar",
+            "maxLength": 50,
+            "isNullable": false
+          },
+          {
+            "name": "Amount",
+            "dataType": "decimal",
+            "precision": 18,
+            "scale": 2,
+            "isNullable": false
+          },
+          {
+            "name": "Status",
+            "dataType": "nvarchar",
+            "maxLength": 20,
+            "isNullable": false,
+            "defaultValue": "'Pending'"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# Content-Type: application/json
+
+# Response:
+# {
+#   "message": "Schema updated successfully"
+# }
+

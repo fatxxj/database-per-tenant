@@ -1,0 +1,69 @@
+# GET /api/data/collections/{collectionName}
+# Query MongoDB collection with optional filters, sorting, and limit
+# Requires Authorization header with Bearer token
+
+# Example 1: Get all documents
+GET /api/data/collections/product_views
+
+# Example 2: Filter by productId
+GET /api/data/collections/product_views?filter={"productId":"PROD-12345"}
+
+# Example 3: Filter with multiple conditions
+GET /api/data/collections/product_views?filter={"productId":"PROD-12345","device":"mobile"}
+
+# Example 4: Sort by timestamp descending
+GET /api/data/collections/product_views?sort={"viewedAt":-1}
+
+# Example 5: Filter, sort, and limit
+GET /api/data/collections/product_views?filter={"converted":true}&sort={"convertedAt":-1}&limit=10
+
+# Example 6: Get user activities for specific user
+GET /api/data/collections/user_activities?filter={"userId":"user-abc-123"}
+
+# Example 7: Get recent activities with limit
+GET /api/data/collections/user_activities?sort={"timestamp":-1}&limit=20
+
+# Example 8: Complex filter with nested fields
+GET /api/data/collections/user_activities?filter={"details.amount":{"$gt":100}}
+
+# Example 9: Filter by date range (MongoDB date operators)
+GET /api/data/collections/analytics?filter={"timestamp":{"$gte":"2024-11-01T00:00:00Z","$lte":"2024-11-30T23:59:59Z"}}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+
+# Query Parameters:
+# - filter: MongoDB filter as JSON string (e.g., {"field":"value"})
+# - sort: Sort specification as JSON (e.g., {"field":1} for ascending, {"field":-1} for descending)
+# - limit: Maximum number of documents (default: 100, max: 1000)
+
+# Response:
+# [
+#   {
+#     "_id": "673886a5e4b0c8d9f1234567",
+#     "productId": "PROD-12345",
+#     "userId": "user-abc-123",
+#     "viewedAt": "2024-11-16T10:30:00Z",
+#     ...
+#   },
+#   ...
+# ]
+
+# MongoDB Query Operators:
+# - $eq: Equals
+# - $ne: Not equals
+# - $gt: Greater than
+# - $gte: Greater than or equal
+# - $lt: Less than
+# - $lte: Less than or equal
+# - $in: In array
+# - $nin: Not in array
+# - $exists: Field exists
+# - $regex: Regular expression
+
+# Examples with operators:
+# ?filter={"age":{"$gte":18}}
+# ?filter={"status":{"$in":["active","pending"]}}
+# ?filter={"email":{"$regex":"@gmail.com"}}
+

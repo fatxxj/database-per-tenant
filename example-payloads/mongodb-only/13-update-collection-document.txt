@@ -1,0 +1,50 @@
+# PUT /api/data/collections/{collectionName}/{id}
+# Update a document in a MongoDB collection
+# Requires Authorization header with Bearer token
+
+# Example 1: Update product view with additional data
+# PUT /api/data/collections/product_views/673886a5e4b0c8d9f1234567
+
+{
+  "converted": true,
+  "convertedAt": "2024-11-16T10:45:00Z",
+  "orderId": "ORD-2024-001"
+}
+
+# Example 2: Update user activity status
+# PUT /api/data/collections/user_activities/673886b8e4b0c8d9f7654321
+
+{
+  "status": "completed",
+  "completedAt": "2024-11-16T10:50:00Z",
+  "metadata": {
+    "processingTime": 125,
+    "retries": 0
+  }
+}
+
+# Example 3: Update analytics with aggregated data
+# PUT /api/data/collections/analytics/673886c3e4b0c8d9f9876543
+
+{
+  "totalInteractions": 15,
+  "conversionScore": 0.85,
+  "processed": true
+}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+# Content-Type: application/json
+
+# Response:
+# {
+#   "message": "Updated successfully"
+# }
+
+# Notes:
+# - Updates merge with existing document (partial update)
+# - To replace entire document, include all fields
+# - _id field cannot be changed
+# - New fields are added automatically
+

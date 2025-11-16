@@ -1,0 +1,90 @@
+# POST /api/events
+# Create a new event in MongoDB events collection
+# Requires Authorization header with Bearer token
+
+# Example 1: User login event
+{
+  "type": "user.login",
+  "payload": {
+    "userId": "user-abc-123",
+    "email": "user@example.com",
+    "method": "password",
+    "ipAddress": "192.168.1.100"
+  }
+}
+
+# Example 2: Order created event
+{
+  "type": "order.created",
+  "payload": {
+    "orderId": "ORD-2024-001",
+    "userId": "user-abc-123",
+    "amount": 199.99,
+    "items": [
+      {
+        "productId": "PROD-12345",
+        "quantity": 2,
+        "price": 99.99
+      }
+    ]
+  }
+}
+
+# Example 3: Payment processed event
+{
+  "type": "payment.processed",
+  "payload": {
+    "orderId": "ORD-2024-001",
+    "transactionId": "txn-xyz-789",
+    "amount": 199.99,
+    "method": "credit_card",
+    "status": "success"
+  }
+}
+
+# Example 4: User registration event
+{
+  "type": "user.registered",
+  "payload": {
+    "userId": "user-new-456",
+    "email": "newuser@example.com",
+    "source": "web",
+    "referralCode": "REF123"
+  }
+}
+
+# Example 5: System event with nested data
+{
+  "type": "system.backup",
+  "payload": {
+    "database": "tenant_abc123",
+    "status": "started",
+    "estimatedDuration": 300,
+    "metadata": {
+      "size": "2.5GB",
+      "tables": 25,
+      "collections": 10
+    }
+  }
+}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+# Content-Type: application/json
+
+# Response:
+# {
+#   "id": "673886a5e4b0c8d9f1234567",
+#   "type": "user.login",
+#   "payload": { ... },
+#   "createdAt": "2024-11-16T10:30:00Z"
+# }
+
+# Notes:
+# - Type is required and describes the event
+# - Payload can be any JSON object
+# - CreatedAt is auto-generated
+# - Id is MongoDB ObjectId
+# - Events are indexed by type and createdAt for efficient querying
+

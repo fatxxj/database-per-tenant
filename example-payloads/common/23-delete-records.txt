@@ -1,0 +1,66 @@
+# Delete Records
+# Requires Authorization header with Bearer token
+
+# ============================================================
+# DELETE TABLE RECORD (SQL Server)
+# ============================================================
+# Delete a record from a table by ID
+
+DELETE /api/data/tables/Products/5
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Response (success):
+# {
+#   "message": "Deleted successfully"
+# }
+
+# Response (not found):
+# HTTP 404 Not Found
+
+
+# ============================================================
+# DELETE COLLECTION DOCUMENT (MongoDB)
+# ============================================================
+# Delete a document from a collection by ID
+
+DELETE /api/data/collections/product_views/673886a5e4b0c8d9f1234567
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Response (success):
+# {
+#   "message": "Deleted successfully"
+# }
+
+# Response (not found):
+# HTTP 404 Not Found
+
+
+# ============================================================
+# More Examples
+# ============================================================
+
+# Delete employee record
+DELETE /api/data/tables/Employees/10
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Delete user activity log
+DELETE /api/data/collections/user_activities/673886b8e4b0c8d9f7654321
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Delete customer
+DELETE /api/data/tables/Customers/25
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+
+# Notes:
+# - Deletion is permanent - no soft delete
+# - Foreign key constraints may prevent deletion
+# - Returns 404 if record doesn't exist
+# - Returns 200 with success message if deleted
+# - Be careful with cascading deletes in SQL Server
+

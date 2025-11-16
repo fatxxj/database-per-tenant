@@ -1,0 +1,89 @@
+# Get Lists of Tables and Collections
+# Requires Authorization header with Bearer token
+
+# ============================================================
+# GET ALL TABLE NAMES (SQL Server)
+# ============================================================
+# List all tables in the tenant's SQL Server database
+
+GET /api/data/tables
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Response:
+# [
+#   "Orders",
+#   "Products",
+#   "Customers",
+#   "Employees",
+#   "Invoices"
+# ]
+
+
+# ============================================================
+# GET TABLE SCHEMA (SQL Server)
+# ============================================================
+# Get detailed schema information for a specific table
+
+GET /api/data/tables/Products/schema
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Response:
+# {
+#   "tableName": "Products",
+#   "columns": [
+#     {
+#       "name": "Id",
+#       "dataType": "int",
+#       "isNullable": false,
+#       "isPrimaryKey": true,
+#       "isIdentity": true
+#     },
+#     {
+#       "name": "SKU",
+#       "dataType": "nvarchar",
+#       "maxLength": 50,
+#       "isNullable": false
+#     },
+#     {
+#       "name": "Name",
+#       "dataType": "nvarchar",
+#       "maxLength": 200,
+#       "isNullable": false
+#     },
+#     {
+#       "name": "Price",
+#       "dataType": "decimal",
+#       "precision": 18,
+#       "scale": 2,
+#       "isNullable": false
+#     }
+#   ]
+# }
+
+
+# ============================================================
+# GET ALL COLLECTION NAMES (MongoDB)
+# ============================================================
+# List all collections in the tenant's MongoDB database
+
+GET /api/data/collections
+Authorization: Bearer {your-jwt-token}
+X-Tenant-Id: {your-tenant-id}
+
+# Response:
+# [
+#   "events",
+#   "product_views",
+#   "user_activities",
+#   "analytics"
+# ]
+
+
+# Notes:
+# - SQL Server endpoints only work for tenants with databaseType 1 or 3
+# - MongoDB endpoints only work for tenants with databaseType 2 or 3
+# - Table schema includes column definitions, types, and constraints
+# - Collection names don't include schema info (MongoDB is schema-less)
+

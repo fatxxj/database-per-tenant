@@ -1,0 +1,99 @@
+# POST /api/data/tables/create
+# Create a new table dynamically in the tenant's SQL Server database
+# Requires Authorization header with Bearer token
+
+{
+  "name": "Employees",
+  "description": "Employee information table",
+  "columns": [
+    {
+      "name": "Id",
+      "dataType": "int",
+      "isPrimaryKey": true,
+      "isNullable": false,
+      "isIdentity": true
+    },
+    {
+      "name": "EmployeeCode",
+      "dataType": "nvarchar",
+      "maxLength": 20,
+      "isNullable": false
+    },
+    {
+      "name": "FirstName",
+      "dataType": "nvarchar",
+      "maxLength": 100,
+      "isNullable": false
+    },
+    {
+      "name": "LastName",
+      "dataType": "nvarchar",
+      "maxLength": 100,
+      "isNullable": false
+    },
+    {
+      "name": "Email",
+      "dataType": "nvarchar",
+      "maxLength": 255,
+      "isNullable": false
+    },
+    {
+      "name": "Department",
+      "dataType": "nvarchar",
+      "maxLength": 100,
+      "isNullable": true
+    },
+    {
+      "name": "Salary",
+      "dataType": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "isNullable": false
+    },
+    {
+      "name": "HireDate",
+      "dataType": "date",
+      "isNullable": false
+    },
+    {
+      "name": "IsActive",
+      "dataType": "bit",
+      "isNullable": false,
+      "defaultValue": "1"
+    },
+    {
+      "name": "CreatedAt",
+      "dataType": "datetime2",
+      "isNullable": false,
+      "defaultValue": "GETUTCDATE()"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "IX_Employees_EmployeeCode",
+      "columns": ["EmployeeCode"],
+      "isUnique": true
+    },
+    {
+      "name": "IX_Employees_Email",
+      "columns": ["Email"],
+      "isUnique": true
+    },
+    {
+      "name": "IX_Employees_Department",
+      "columns": ["Department"],
+      "isUnique": false
+    }
+  ]
+}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+# Content-Type: application/json
+
+# Response:
+# {
+#   "message": "Table 'Employees' created successfully"
+# }
+

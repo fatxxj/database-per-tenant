@@ -1,0 +1,58 @@
+# GET /api/events
+# Query events from MongoDB with optional type filter
+# Requires Authorization header with Bearer token
+
+# Example 1: Get all events (latest 50)
+GET /api/events
+
+# Example 2: Filter by event type
+GET /api/events?type=user.login
+
+# Example 3: Get order events
+GET /api/events?type=order.created
+
+# Example 4: Get payment events
+GET /api/events?type=payment.processed
+
+# Example 5: Get system events
+GET /api/events?type=system.backup
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+
+# Query Parameters:
+# - type: (optional) Filter events by type
+
+# Response:
+# [
+#   {
+#     "id": "673886a5e4b0c8d9f1234567",
+#     "type": "user.login",
+#     "payload": {
+#       "userId": "user-abc-123",
+#       "email": "user@example.com",
+#       "method": "password",
+#       "ipAddress": "192.168.1.100"
+#     },
+#     "createdAt": "2024-11-16T10:30:00Z"
+#   },
+#   {
+#     "id": "673886b8e4b0c8d9f7654321",
+#     "type": "user.login",
+#     "payload": {
+#       "userId": "user-def-456",
+#       "email": "another@example.com",
+#       "method": "oauth",
+#       "ipAddress": "192.168.1.101"
+#     },
+#     "createdAt": "2024-11-16T10:25:00Z"
+#   }
+# ]
+
+# Notes:
+# - Results are sorted by createdAt descending (newest first)
+# - Limited to 50 events by default
+# - Type filter is optional - omit to get all event types
+# - Events are indexed by type for efficient filtering
+

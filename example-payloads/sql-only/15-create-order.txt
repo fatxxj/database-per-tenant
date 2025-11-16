@@ -1,0 +1,48 @@
+# POST /api/orders
+# Create a new order in the default Orders table (SQL Server)
+# Requires Authorization header with Bearer token
+
+{
+  "code": "ORD-2024-001",
+  "amount": 199.99
+}
+
+# More examples:
+
+# Example 1: Simple order
+{
+  "code": "ORD-2024-002",
+  "amount": 49.99
+}
+
+# Example 2: Large order
+{
+  "code": "ORD-2024-003",
+  "amount": 1599.00
+}
+
+# Example 3: Fractional amount
+{
+  "code": "ORD-2024-004",
+  "amount": 123.45
+}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+# Content-Type: application/json
+
+# Response:
+# {
+#   "id": "generated-uuid",
+#   "code": "ORD-2024-001",
+#   "amount": 199.99,
+#   "createdAt": "2024-11-16T10:30:00Z"
+# }
+
+# Notes:
+# - Code must be provided and cannot be empty
+# - Amount is a decimal value
+# - Id and CreatedAt are auto-generated
+# - This uses the default Orders table created during tenant provisioning
+

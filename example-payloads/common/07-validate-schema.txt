@@ -1,0 +1,44 @@
+# POST /schema/validate
+# Validate schema definition without creating it
+
+{
+  "schemaDefinition": {
+    "version": "1.0",
+    "name": "Test Schema",
+    "tables": [
+      {
+        "name": "TestTable",
+        "columns": [
+          {
+            "name": "Id",
+            "dataType": "int",
+            "isPrimaryKey": true,
+            "isNullable": false,
+            "isIdentity": true
+          },
+          {
+            "name": "Name",
+            "dataType": "nvarchar",
+            "maxLength": 100,
+            "isNullable": false
+          }
+        ]
+      }
+    ]
+  }
+}
+
+# Response (valid):
+# {
+#   "isValid": true,
+#   "errors": []
+# }
+
+# Response (invalid):
+# {
+#   "isValid": false,
+#   "errors": [
+#     "Table 'TestTable' must have at least one primary key column"
+#   ]
+# }
+

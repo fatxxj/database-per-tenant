@@ -1,0 +1,153 @@
+# POST /tenants
+# Create a tenant with custom schema definition
+
+{
+  "name": "E-Commerce Company",
+  "databaseType": 3,
+  "schemaDefinition": {
+    "version": "1.0",
+    "name": "E-Commerce Schema",
+    "description": "Schema for e-commerce application",
+    "tables": [
+      {
+        "name": "Products",
+        "description": "Product catalog",
+        "columns": [
+          {
+            "name": "Id",
+            "dataType": "int",
+            "isPrimaryKey": true,
+            "isNullable": false,
+            "isIdentity": true
+          },
+          {
+            "name": "SKU",
+            "dataType": "nvarchar",
+            "maxLength": 50,
+            "isNullable": false
+          },
+          {
+            "name": "Name",
+            "dataType": "nvarchar",
+            "maxLength": 200,
+            "isNullable": false
+          },
+          {
+            "name": "Price",
+            "dataType": "decimal",
+            "precision": 18,
+            "scale": 2,
+            "isNullable": false
+          },
+          {
+            "name": "Stock",
+            "dataType": "int",
+            "isNullable": false,
+            "defaultValue": "0"
+          },
+          {
+            "name": "IsActive",
+            "dataType": "bit",
+            "isNullable": false,
+            "defaultValue": "1"
+          },
+          {
+            "name": "CreatedAt",
+            "dataType": "datetime2",
+            "isNullable": false,
+            "defaultValue": "GETUTCDATE()"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "IX_Products_SKU",
+            "columns": ["SKU"],
+            "isUnique": true
+          },
+          {
+            "name": "IX_Products_Name",
+            "columns": ["Name"],
+            "isUnique": false
+          }
+        ]
+      },
+      {
+        "name": "Customers",
+        "description": "Customer information",
+        "columns": [
+          {
+            "name": "Id",
+            "dataType": "int",
+            "isPrimaryKey": true,
+            "isNullable": false,
+            "isIdentity": true
+          },
+          {
+            "name": "Email",
+            "dataType": "nvarchar",
+            "maxLength": 255,
+            "isNullable": false
+          },
+          {
+            "name": "FirstName",
+            "dataType": "nvarchar",
+            "maxLength": 100,
+            "isNullable": false
+          },
+          {
+            "name": "LastName",
+            "dataType": "nvarchar",
+            "maxLength": 100,
+            "isNullable": false
+          },
+          {
+            "name": "CreatedAt",
+            "dataType": "datetime2",
+            "isNullable": false,
+            "defaultValue": "GETUTCDATE()"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "IX_Customers_Email",
+            "columns": ["Email"],
+            "isUnique": true
+          }
+        ]
+      }
+    ],
+    "collections": [
+      {
+        "name": "product_views",
+        "description": "Product view tracking",
+        "indexes": [
+          {
+            "keys": { "productId": 1, "viewedAt": -1 },
+            "name": "idx_product_viewed"
+          },
+          {
+            "keys": { "userId": 1 },
+            "name": "idx_user"
+          }
+        ]
+      },
+      {
+        "name": "user_activities",
+        "description": "User activity logs",
+        "indexes": [
+          {
+            "keys": { "userId": 1, "timestamp": -1 },
+            "name": "idx_user_activity"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+# Response:
+# {
+#   "tenantId": "ecomm123xyz",
+#   "databaseType": "Both"
+# }
+

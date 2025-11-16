@@ -1,0 +1,52 @@
+# POST /api/data/tables/{tableName}
+# Insert a record into a table
+# Requires Authorization header with Bearer token
+
+# Example 1: Insert into Employees table
+# POST /api/data/tables/Employees
+
+{
+  "EmployeeCode": "EMP001",
+  "FirstName": "John",
+  "LastName": "Doe",
+  "Email": "john.doe@company.com",
+  "Department": "Engineering",
+  "Salary": 75000.00,
+  "HireDate": "2024-01-15",
+  "IsActive": 1
+}
+
+# Example 2: Insert into Products table
+# POST /api/data/tables/Products
+
+{
+  "SKU": "PROD-12345",
+  "Name": "Wireless Mouse",
+  "Price": 29.99,
+  "Stock": 150,
+  "IsActive": 1
+}
+
+# Example 3: Insert into Orders table (default)
+# POST /api/data/tables/Orders
+
+{
+  "Code": "ORD-2024-001",
+  "Amount": 199.99
+}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+# Content-Type: application/json
+
+# Response:
+# {
+#   "id": "generated-id-or-identity-value"
+# }
+
+# Notes:
+# - Do not include Id field if it's an identity column
+# - Do not include fields with default values unless you want to override them
+# - All required (non-nullable) fields without defaults must be provided
+

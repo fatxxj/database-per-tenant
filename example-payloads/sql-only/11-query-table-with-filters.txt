@@ -1,0 +1,55 @@
+# GET /api/data/tables/{tableName}
+# Query table with optional filters, ordering, and limit
+# Requires Authorization header with Bearer token
+
+# Example 1: Get all employees
+GET /api/data/tables/Employees
+
+# Example 2: Filter employees by department
+GET /api/data/tables/Employees?where=Department='Engineering'
+
+# Example 3: Filter with multiple conditions
+GET /api/data/tables/Employees?where=Department='Engineering' AND IsActive=1
+
+# Example 4: Order by salary descending
+GET /api/data/tables/Employees?orderBy=Salary DESC
+
+# Example 5: Filter, order, and limit
+GET /api/data/tables/Employees?where=IsActive=1&orderBy=HireDate DESC&limit=10
+
+# Example 6: Get products with low stock
+GET /api/data/tables/Products?where=Stock<50&orderBy=Stock ASC
+
+# Example 7: Get recent orders
+GET /api/data/tables/Orders?orderBy=CreatedAt DESC&limit=20
+
+# Example 8: Complex filter with date
+GET /api/data/tables/Employees?where=HireDate>'2023-01-01' AND Salary>=50000
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+
+# Query Parameters:
+# - where: SQL WHERE clause (sanitized for security)
+# - orderBy: Column name with ASC/DESC
+# - limit: Maximum number of records (default: 100, max: 1000)
+
+# Response:
+# [
+#   {
+#     "Id": 1,
+#     "EmployeeCode": "EMP001",
+#     "FirstName": "John",
+#     "LastName": "Doe",
+#     ...
+#   },
+#   ...
+# ]
+
+# Notes:
+# - WHERE clause is sanitized to prevent SQL injection
+# - Dangerous SQL keywords are blocked
+# - Use single quotes for string values
+# - Operators allowed: =, <>, !=, <, >, <=, >=, AND, OR, LIKE, IN, BETWEEN
+

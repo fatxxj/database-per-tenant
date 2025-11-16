@@ -1,0 +1,19 @@
+# POST /tenants
+# Create a tenant with MongoDB database only
+
+{
+  "name": "Mongo Company",
+  "databaseType": 2
+}
+
+# Response:
+# {
+#   "tenantId": "xyz789abc012",
+#   "databaseType": "MongoDb"
+# }
+
+# Notes:
+# - databaseType: 1 = SqlServer, 2 = MongoDb, 3 = Both (default)
+# - Only MongoDB database will be provisioned
+# - No default collections created
+

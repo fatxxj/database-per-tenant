@@ -1,0 +1,92 @@
+# POST /api/data/collections/{collectionName}
+# Insert a document into a MongoDB collection
+# Requires Authorization header with Bearer token
+
+# Example 1: Insert product view tracking
+# POST /api/data/collections/product_views
+
+{
+  "productId": "PROD-12345",
+  "userId": "user-abc-123",
+  "viewedAt": "2024-11-16T10:30:00Z",
+  "sessionId": "session-xyz-789",
+  "referrer": "google",
+  "device": "mobile",
+  "metadata": {
+    "browser": "Chrome",
+    "os": "iOS",
+    "version": "17.0"
+  }
+}
+
+# Example 2: Insert user activity log
+# POST /api/data/collections/user_activities
+
+{
+  "userId": "user-abc-123",
+  "action": "purchase",
+  "timestamp": "2024-11-16T10:35:00Z",
+  "details": {
+    "orderId": "ORD-2024-001",
+    "amount": 199.99,
+    "items": [
+      {
+        "productId": "PROD-12345",
+        "quantity": 2,
+        "price": 99.99
+      }
+    ]
+  },
+  "ipAddress": "192.168.1.100",
+  "userAgent": "Mozilla/5.0..."
+}
+
+# Example 3: Insert event log
+# POST /api/data/collections/events
+
+{
+  "type": "user.login",
+  "timestamp": "2024-11-16T10:00:00Z",
+  "payload": {
+    "userId": "user-abc-123",
+    "email": "user@example.com",
+    "method": "oauth",
+    "provider": "google"
+  },
+  "metadata": {
+    "ipAddress": "192.168.1.100",
+    "country": "US",
+    "city": "New York"
+  }
+}
+
+# Example 4: Insert analytics data
+# POST /api/data/collections/analytics
+
+{
+  "page": "/products/wireless-mouse",
+  "sessionId": "session-xyz-789",
+  "timestamp": "2024-11-16T10:30:00Z",
+  "duration": 45,
+  "interactions": [
+    {"type": "scroll", "position": 50, "time": 5},
+    {"type": "click", "element": "add-to-cart", "time": 30}
+  ]
+}
+
+# Headers:
+# Authorization: Bearer {your-jwt-token}
+# X-Tenant-Id: {your-tenant-id}
+# Content-Type: application/json
+
+# Response:
+# {
+#   "id": "673886a5e4b0c8d9f1234567"
+# }
+
+# Notes:
+# - MongoDB auto-generates _id if not provided
+# - Flexible schema - any valid JSON structure accepted
+# - Nested objects and arrays supported
+# - Timestamps stored as ISO 8601 strings or Date objects
+
