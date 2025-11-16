@@ -27,6 +27,11 @@ public class SqlConnectionFactory
             throw new InvalidOperationException(Constants.ErrorMessages.TenantContextNotFound);
         }
 
+        if (string.IsNullOrEmpty(tenantCtx.Connections.SqlServerConnectionString))
+        {
+            throw new InvalidOperationException($"Tenant '{tenantCtx.Tenant.Name}' (ID: {tenantCtx.Tenant.Id}) does not have SQL Server database provisioned. This tenant uses {tenantCtx.Tenant.DatabaseType} database type.");
+        }
+
         var connectionString = tenantCtx.Connections.SqlServerConnectionString;
         var connection = new SqlConnection(connectionString);
         

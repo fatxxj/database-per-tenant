@@ -25,6 +25,12 @@ public class MongoDbFactory : IMongoDbFactory
             throw new InvalidOperationException(Constants.ErrorMessages.TenantContextNotFound);
         }
 
+        if (string.IsNullOrEmpty(tenantCtx.Connections.MongoDbConnectionString) || 
+            string.IsNullOrEmpty(tenantCtx.Connections.MongoDbDatabaseName))
+        {
+            throw new InvalidOperationException($"Tenant '{tenantCtx.Tenant.Name}' (ID: {tenantCtx.Tenant.Id}) does not have MongoDB database provisioned. This tenant uses {tenantCtx.Tenant.DatabaseType} database type.");
+        }
+
         var client = new MongoClient(tenantCtx.Connections.MongoDbConnectionString);
         var database = client.GetDatabase(tenantCtx.Connections.MongoDbDatabaseName);
         

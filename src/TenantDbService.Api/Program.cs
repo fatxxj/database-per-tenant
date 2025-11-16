@@ -210,8 +210,8 @@ app.MapPost("/tenants", async (ProvisioningService provisioningService, [FromBod
     if (string.IsNullOrEmpty(request.Name))
         return Results.BadRequest(new { error = Constants.ErrorMessages.TenantNameRequired });
     
-    var tenantId = await provisioningService.CreateTenantAsync(request.Name, request.SchemaDefinition);
-    return Results.Ok(new { tenantId });
+    var tenantId = await provisioningService.CreateTenantAsync(request.Name, request.DatabaseType, request.SchemaDefinition);
+    return Results.Ok(new { tenantId, databaseType = request.DatabaseType.ToString() });
 })
 .WithName("CreateTenant")
 .WithTags("Tenant Management");
@@ -511,8 +511,8 @@ using (var scope = app.Services.CreateScope())
         var existingTenants = await catalogRepository.GetAllTenantsAsync();
         if (!existingTenants.Any())
         {
-            var demoTenantId = await provisioningService.CreateTenantAsync("demo-tenant");
-            app.Logger.LogInformation("Demo tenant created with ID: {TenantId}", demoTenantId);
+            var demoTenantId = await provisioningService.CreateTenantAsync("demo-tenant", DatabaseType.Both);
+            app.Logger.LogInformation("Demo tenant created with ID: {TenantId} using database type: Both", demoTenantId);
         }
     }
     catch (Exception ex)
@@ -526,6 +526,6 @@ app.Run();
 
 // Request/Response models
 public record DevTokenRequest(string TenantId);
-public record CreateTenantRequest(string Name, SchemaDefinition? SchemaDefinition = null);
+public record CreateTenantRequest(string Name, DatabaseType DatabaseType = DatabaseType.Both, SchemaDefinition? SchemaDefinition = null);
 public record CreateOrderRequest(string Code, decimal Amount);
 public record CreateEventRequest(string Type, object Payload);

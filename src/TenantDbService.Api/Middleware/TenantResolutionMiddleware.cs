@@ -43,8 +43,8 @@ public class TenantResolutionMiddleware
             return;
         }
 
-        var tenantExists = await catalogRepository.TenantExistsAsync(tenantId);
-        if (!tenantExists)
+        var tenant = await catalogRepository.GetTenantAsync(tenantId);
+        if (tenant == null)
         {
             context.Response.StatusCode = 404;
             await context.Response.WriteAsJsonAsync(new { error = string.Format(Constants.ErrorMessages.TenantNotFound, tenantId) });
@@ -62,6 +62,7 @@ public class TenantResolutionMiddleware
         var tenantContext = new TenantContext
         {
             TenantId = tenantId,
+            Tenant = tenant,
             Connections = connections
         };
 

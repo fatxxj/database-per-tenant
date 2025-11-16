@@ -5,6 +5,7 @@ namespace TenantDbService.Api.Common;
 public class TenantContext
 {
     public string TenantId { get; set; } = string.Empty;
+    public Tenant Tenant { get; set; } = new();
     public TenantConnections Connections { get; set; } = new();
 }
 

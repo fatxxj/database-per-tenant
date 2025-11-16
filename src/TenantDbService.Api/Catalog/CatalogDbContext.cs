@@ -31,9 +31,9 @@ public class CatalogDbContext : DbContext
         {
             entity.HasKey(e => e.TenantId);
             entity.Property(e => e.TenantId).HasMaxLength(32);
-            entity.Property(e => e.SqlServerConnectionString).HasMaxLength(500).IsRequired();
-            entity.Property(e => e.MongoDbConnectionString).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.MongoDbDatabaseName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.SqlServerConnectionString).HasMaxLength(500);
+            entity.Property(e => e.MongoDbConnectionString).HasMaxLength(200);
+            entity.Property(e => e.MongoDbDatabaseName).HasMaxLength(100);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             
             entity.HasOne(e => e.Tenant)

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using TenantDbService.Api.Common;
 
 namespace TenantDbService.Api.Catalog.Entities;
 
@@ -14,17 +15,19 @@ public class Tenant
     
     [Required]
     [StringLength(20)]
-    public string Status { get; set; } = Common.Constants.TenantStatus.Active;
+    public string Status { get; set; } = Constants.TenantStatus.Active;
+    
+    [Required]
+    public DatabaseType DatabaseType { get; set; } = DatabaseType.Both;
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
     [StringLength(50)]
-    public string SchemaVersion { get; set; } = Common.Constants.SchemaDefaults.DefaultVersion;
+    public string SchemaVersion { get; set; } = Constants.SchemaDefaults.DefaultVersion;
     
-    public string? SchemaDefinition { get; set; } // JSON schema definition
+    public string? SchemaDefinition { get; set; }
     
     public DateTime? SchemaUpdatedAt { get; set; }
     
-    // Navigation property
     public virtual TenantConnections? Connections { get; set; }
 }

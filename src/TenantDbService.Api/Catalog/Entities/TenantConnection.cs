@@ -9,21 +9,17 @@ public class TenantConnections
     [StringLength(32)]
     public string TenantId { get; set; } = string.Empty;
     
-    [Required]
     [StringLength(500)]
-    public string SqlServerConnectionString { get; set; } = string.Empty;
+    public string? SqlServerConnectionString { get; set; }
     
-    [Required]
     [StringLength(200)]
-    public string MongoDbConnectionString { get; set; } = string.Empty;
+    public string? MongoDbConnectionString { get; set; }
     
-    [Required]
     [StringLength(100)]
-    public string MongoDbDatabaseName { get; set; } = string.Empty;
+    public string? MongoDbDatabaseName { get; set; }
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
-    // Navigation property
     [ForeignKey("TenantId")]
     public virtual Tenant? Tenant { get; set; }
 }

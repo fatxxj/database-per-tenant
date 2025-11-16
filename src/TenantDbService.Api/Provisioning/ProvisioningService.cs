@@ -40,7 +40,7 @@ public class ProvisioningService
         _mongoSettings = mongoSettings.Value;
     }
 
-    public async Task<string> CreateTenantAsync(string name, SchemaDefinition? schemaDefinition = null)
+    public async Task<string> CreateTenantAsync(string name, DatabaseType databaseType, SchemaDefinition? schemaDefinition = null)
     {
         if (string.IsNullOrEmpty(name))
             throw new ArgumentException(Constants.ErrorMessages.TenantNameRequired, nameof(name));
@@ -58,15 +58,28 @@ public class ProvisioningService
         }
 
         var tenantId = await GenerateUniqueTenantIdAsync();
-        var sqlConnectionString = _sqlSettings.Template.Replace("{TENANTID}", tenantId);
-        var mongoConnectionString = _mongoSettings.Template;
-        var mongoDatabaseName = _mongoSettings.DatabaseTemplate.Replace("{TENANTID}", tenantId);
+        
+        string? sqlConnectionString = null;
+        string? mongoConnectionString = null;
+        string? mongoDatabaseName = null;
+
+        if (databaseType == DatabaseType.SqlServer || databaseType == DatabaseType.Both)
+        {
+            sqlConnectionString = _sqlSettings.Template.Replace("{TENANTID}", tenantId);
+        }
+
+        if (databaseType == DatabaseType.MongoDb || databaseType == DatabaseType.Both)
+        {
+            mongoConnectionString = _mongoSettings.Template;
+            mongoDatabaseName = _mongoSettings.DatabaseTemplate.Replace("{TENANTID}", tenantId);
+        }
 
         var tenant = new Tenant
         {
             Id = tenantId,
             Name = name,
             Status = Constants.TenantStatus.Active,
+            DatabaseType = databaseType,
             CreatedAt = DateTime.UtcNow,
             SchemaVersion = schemaDefinition?.Version ?? Constants.SchemaDefaults.DefaultVersion,
             SchemaDefinition = schemaDefinition != null ? System.Text.Json.JsonSerializer.Serialize(schemaDefinition) : null,
@@ -86,19 +99,32 @@ public class ProvisioningService
         {
             await _catalogRepository.CreateTenantAsync(tenant, connections);
             
-            await ProvisionSqlServerDatabaseAsync(tenantId);
-            await ProvisionMongoDatabaseAsync(tenantId, mongoDatabaseName);
-
-            if (schemaDefinition == null)
+            if (databaseType == DatabaseType.SqlServer || databaseType == DatabaseType.Both)
             {
-                await EnsureDefaultSqlSchemaAsync(tenantId);
-            }
-            else
-            {
-                await CreateDynamicSchemaAsync(tenantId, schemaDefinition);
+                await ProvisionSqlServerDatabaseAsync(tenantId);
+                
+                if (schemaDefinition == null)
+                {
+                    await EnsureDefaultSqlSchemaAsync(tenantId);
+                }
+                else
+                {
+                    await CreateDynamicSchemaAsync(tenantId, databaseType, schemaDefinition);
+                }
             }
 
-            _logger.LogInformation("Successfully created tenant: {TenantId} with name: {TenantName}", tenantId, name);
+            if (databaseType == DatabaseType.MongoDb || databaseType == DatabaseType.Both)
+            {
+                await ProvisionMongoDatabaseAsync(tenantId, mongoDatabaseName!);
+                
+                if (schemaDefinition != null)
+                {
+                    await CreateDynamicSchemaAsync(tenantId, databaseType, schemaDefinition);
+                }
+            }
+
+            _logger.LogInformation("Successfully created tenant: {TenantId} with name: {TenantName} and database type: {DatabaseType}", 
+                tenantId, name, databaseType);
             return tenantId;
         }
         catch (Exception ex)
@@ -108,7 +134,7 @@ public class ProvisioningService
             try
             {
                 await _catalogRepository.DisableTenantAsync(tenantId);
-                await CleanupDatabasesAsync(tenantId, mongoDatabaseName);
+                await CleanupDatabasesAsync(tenantId, databaseType, mongoDatabaseName);
             }
             catch (Exception rollbackEx)
             {
@@ -144,20 +170,26 @@ public class ProvisioningService
         _logger.LogInformation("Successfully updated schema for tenant: {TenantId}", tenantId);
     }
 
-    private async Task CreateDynamicSchemaAsync(string tenantId, SchemaDefinition schemaDefinition)
+    private async Task CreateDynamicSchemaAsync(string tenantId, DatabaseType databaseType, SchemaDefinition schemaDefinition)
     {
         try
         {
-            using var sqlConnection = new Microsoft.Data.SqlClient.SqlConnection(_sqlSettings.Template.Replace("{TENANTID}", tenantId));
-            await sqlConnection.OpenAsync();
-            await _schemaService.CreateSchemaAsync(sqlConnection, schemaDefinition);
+            if (databaseType == DatabaseType.SqlServer || databaseType == DatabaseType.Both)
+            {
+                using var sqlConnection = new Microsoft.Data.SqlClient.SqlConnection(_sqlSettings.Template.Replace("{TENANTID}", tenantId));
+                await sqlConnection.OpenAsync();
+                await _schemaService.CreateSchemaAsync(sqlConnection, schemaDefinition);
+                _logger.LogInformation("SQL schema created for tenant: {TenantId}", tenantId);
+            }
 
-            var mongoClient = new MongoClient(_mongoSettings.Template);
-            var databaseName = _mongoSettings.DatabaseTemplate.Replace("{TENANTID}", tenantId);
-            var database = mongoClient.GetDatabase(databaseName);
-            await _schemaService.CreateMongoCollectionsAsync(database, schemaDefinition);
-
-            _logger.LogInformation("Dynamic schema created for tenant: {TenantId}", tenantId);
+            if (databaseType == DatabaseType.MongoDb || databaseType == DatabaseType.Both)
+            {
+                var mongoClient = new MongoClient(_mongoSettings.Template);
+                var databaseName = _mongoSettings.DatabaseTemplate.Replace("{TENANTID}", tenantId);
+                var database = mongoClient.GetDatabase(databaseName);
+                await _schemaService.CreateMongoCollectionsAsync(database, schemaDefinition);
+                _logger.LogInformation("MongoDB schema created for tenant: {TenantId}", tenantId);
+            }
         }
         catch (Exception ex)
         {
@@ -170,8 +202,14 @@ public class ProvisioningService
     {
         try
         {
+            var tenant = await _catalogRepository.GetTenantAsync(tenantId);
+            if (tenant == null)
+            {
+                throw new ArgumentException(string.Format(Constants.ErrorMessages.TenantNotFound, tenantId));
+            }
+
             var currentSchema = await _catalogRepository.GetSchemaAsync(tenantId);
-            await CreateDynamicSchemaAsync(tenantId, schemaDefinition);
+            await CreateDynamicSchemaAsync(tenantId, tenant.DatabaseType, schemaDefinition);
             _logger.LogInformation("Schema changes applied for tenant: {TenantId}", tenantId);
         }
         catch (Exception ex)
@@ -312,34 +350,40 @@ END";
         return new string(result);
     }
 
-    private async Task CleanupDatabasesAsync(string tenantId, string mongoDatabaseName)
+    private async Task CleanupDatabasesAsync(string tenantId, DatabaseType databaseType, string? mongoDatabaseName)
     {
-        try
+        if (databaseType == DatabaseType.SqlServer || databaseType == DatabaseType.Both)
         {
-            var masterConnectionString = _sqlSettings.Template.Replace("Database=tenant_{TENANTID}", "Database=master");
-            using var masterConnection = new Microsoft.Data.SqlClient.SqlConnection(masterConnectionString);
-            await masterConnection.OpenAsync();
-            
-            var databaseName = $"tenant_{tenantId}";
-            var dropDbQuery = $"IF EXISTS (SELECT * FROM sys.databases WHERE name = '{databaseName}') DROP DATABASE [{databaseName}]";
-            await masterConnection.ExecuteAsync(dropDbQuery);
-            
-            _logger.LogInformation("Cleaned up SQL Server database: {DatabaseName}", databaseName);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to cleanup SQL Server database for tenant: {TenantId}", tenantId);
+            try
+            {
+                var masterConnectionString = _sqlSettings.Template.Replace("Database=tenant_{TENANTID}", "Database=master");
+                using var masterConnection = new Microsoft.Data.SqlClient.SqlConnection(masterConnectionString);
+                await masterConnection.OpenAsync();
+                
+                var databaseName = $"tenant_{tenantId}";
+                var dropDbQuery = $"IF EXISTS (SELECT * FROM sys.databases WHERE name = '{databaseName}') DROP DATABASE [{databaseName}]";
+                await masterConnection.ExecuteAsync(dropDbQuery);
+                
+                _logger.LogInformation("Cleaned up SQL Server database: {DatabaseName}", databaseName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to cleanup SQL Server database for tenant: {TenantId}", tenantId);
+            }
         }
 
-        try
+        if ((databaseType == DatabaseType.MongoDb || databaseType == DatabaseType.Both) && !string.IsNullOrEmpty(mongoDatabaseName))
         {
-            var client = new MongoClient(_mongoSettings.Template);
-            await client.DropDatabaseAsync(mongoDatabaseName);
-            _logger.LogInformation("Cleaned up MongoDB database: {DatabaseName}", mongoDatabaseName);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to cleanup MongoDB database for tenant: {TenantId}", tenantId);
+            try
+            {
+                var client = new MongoClient(_mongoSettings.Template);
+                await client.DropDatabaseAsync(mongoDatabaseName);
+                _logger.LogInformation("Cleaned up MongoDB database: {DatabaseName}", mongoDatabaseName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to cleanup MongoDB database for tenant: {TenantId}", tenantId);
+            }
         }
     }
 }
