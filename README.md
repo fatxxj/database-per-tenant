@@ -1,19 +1,20 @@
 # TenantDbService
 
-A production-quality multi-tenant database microservice for generic SaaS applications, supporting both SQL Server and MongoDB per tenant.
+A production-quality multi-tenant database microservice for generic SaaS applications. Provides database-per-tenant isolation with flexible database type selection: SQL Server only, MongoDB only, or both.
 
 ## Architecture Overview
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   API Gateway   │    │   Load Balancer │    │   Client Apps   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         Client Apps                              │
+│              (SQL-only, MongoDB-only, or Hybrid)                 │
+└─────────────────────────────────────────────────────────────────┘
                                  │
                     ┌─────────────────┐
                     │ TenantDbService │
                     │   (API Layer)   │
+                    │  Multi-Tenancy  │
+                    │   Microservice  │
                     └─────────────────┘
                                  │
                     ┌─────────────────┐
@@ -21,30 +22,38 @@ A production-quality multi-tenant database microservice for generic SaaS applica
                     │  (SQL Server)   │
                     │  - Tenants      │
                     │  - Connections  │
+                    │  - DB Types     │
                     └─────────────────┘
                                  │
          ┌───────────────────────┼───────────────────────┐
          │                       │                       │
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Tenant A SQL    │    │ Tenant B SQL    │    │ Tenant C SQL    │
-│ Database        │    │ Database        │    │ Database        │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Tenant A Mongo  │    │ Tenant B Mongo  │    │ Tenant C Mongo  │
-│ Database        │    │ Database        │    │ Database        │
+│ Tenant A        │    │ Tenant B        │    │ Tenant C        │
+│ (SQL Only)      │    │ (MongoDB Only)  │    │ (Both)          │
+│                 │    │                 │    │                 │
+│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
+│ │ SQL Server  │ │    │ │  MongoDB    │ │    │ │ SQL Server  │ │
+│ │  Database   │ │    │ │  Database   │ │    │ │  Database   │ │
+│ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │
+│                 │    │                 │    │ ┌─────────────┐ │
+│                 │    │                 │    │ │  MongoDB    │ │
+│                 │    │                 │    │ │  Database   │ │
+│                 │    │                 │    │ └─────────────┘ │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ### Key Features
 
-- **Database-per-tenant isolation**: Each tenant gets separate SQL Server and MongoDB databases
+- **Flexible Database Selection**: Choose SQL Server, MongoDB, or both per tenant
+- **Database-per-tenant isolation**: Complete data separation with dedicated databases
+- **Multi-SaaS Support**: Designed to serve multiple SaaS applications with different database needs
 - **JWT Authentication**: Bearer token authentication with tenant claims
 - **Tenant Resolution**: Automatic tenant identification via JWT claims or headers
 - **Connection Caching**: In-memory caching for tenant connections (5-minute TTL)
+- **Dynamic Schema Management**: Create tables and collections on-demand
 - **Health Monitoring**: Comprehensive health checks for all components
 - **Observability**: Built-in metrics, logging, and correlation IDs
-- **Load Testing**: k6 scripts for performance validation
+- **Production-Ready**: Security best practices, error handling, and rollback mechanisms
 
 ## Technology Stack
 
@@ -98,14 +107,31 @@ Open Swagger UI: http://localhost:8080/swagger
 
 ### 4. Create Your First Tenant
 
+You can create tenants with different database types:
+
 ```bash
-# Create a tenant
+# Create a tenant with SQL Server only
 curl -X POST http://localhost:8080/tenants \
   -H "Content-Type: application/json" \
-  -d '{"name": "My Company"}'
+  -d '{"name": "SQL Company", "databaseType": 1}'
 
-# Response: {"tenantId": "abc123def456"}
+# Create a tenant with MongoDB only
+curl -X POST http://localhost:8080/tenants \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Mongo Company", "databaseType": 2}'
+
+# Create a tenant with both databases (default)
+curl -X POST http://localhost:8080/tenants \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Hybrid Company", "databaseType": 3}'
+
+# Response: {"tenantId": "abc123def456", "databaseType": "SqlServer"}
 ```
+
+**Database Type Values:**
+- `1` = SQL Server only
+- `2` = MongoDB only  
+- `3` = Both (default if not specified)
 
 ### 5. Get Authentication Token
 
@@ -185,11 +211,44 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ## Data Isolation
 
-Each tenant gets:
-- **SQL Server Database**: `tenant_{tenantId}` with Orders table
-- **MongoDB Database**: `tenant_{tenantId}` with events collection
+Each tenant gets dedicated databases based on their selected database type:
 
-Data is completely isolated between tenants. A tenant can only access their own data.
+**SQL Server Only:**
+- SQL Server Database: `tenant_{tenantId}`
+- Tables: Orders (default), plus any custom tables from schema definition
+
+**MongoDB Only:**
+- MongoDB Database: `tenant_{tenantId}`
+- Collections: events, plus any custom collections from schema definition
+
+**Both Databases:**
+- SQL Server Database: `tenant_{tenantId}` for relational data
+- MongoDB Database: `tenant_{tenantId}` for document data
+
+Data is completely isolated between tenants. A tenant can only access their own data through their provisioned database type(s).
+
+## Use Cases
+
+### SQL Server Only
+Perfect for SaaS applications that:
+- Require ACID transactions and relational integrity
+- Use structured data with complex relationships
+- Need advanced query capabilities (joins, aggregations)
+- Examples: ERP systems, CRM platforms, financial applications
+
+### MongoDB Only
+Ideal for SaaS applications that:
+- Work with flexible, document-based data
+- Need high-write throughput for events/logs
+- Require schema flexibility and rapid iteration
+- Examples: Analytics platforms, IoT applications, content management systems
+
+### Both Databases
+Best for SaaS applications that:
+- Have mixed data requirements (structured + flexible)
+- Store transactional data in SQL + events/logs in MongoDB
+- Need different databases for different features
+- Examples: E-commerce platforms, healthcare systems, complex enterprise applications
 
 ## Development
 
@@ -253,10 +312,13 @@ make clean
 
 - Use strong JWT keys (32+ characters)
 - Configure proper connection strings for production databases
-- Set up monitoring and alerting
+- Choose appropriate database types for each tenant based on their needs
+- Only provision required database types to optimize resource usage
+- Set up monitoring and alerting for both SQL Server and MongoDB
 - Use HTTPS in production
 - Configure proper logging levels
-- Set up database backups
+- Set up database backups for all provisioned databases
+- Monitor database costs - tenants only pay for what they use
 
 ## Load Testing
 
