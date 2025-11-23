@@ -566,11 +566,16 @@ public class MongoDbOnlyTenantIntegrationTests : IClassFixture<TestDatabaseFixtu
         {
             try
             {
-                var catalogRepository = GetService<ICatalogRepository>();
-                catalogRepository.DisableTenantAsync(_testTenantId).GetAwaiter().GetResult();
+                TestDatabaseCleanupHelper.CleanupTenantAsync(
+                    _serviceProvider, 
+                    _testTenantId, 
+                    DatabaseType.MongoDb)
+                    .GetAwaiter()
+                    .GetResult();
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Warning: Failed to cleanup test tenant {_testTenantId}: {ex.Message}");
             }
         }
     }

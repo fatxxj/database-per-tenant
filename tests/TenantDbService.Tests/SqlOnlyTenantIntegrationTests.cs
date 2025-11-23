@@ -661,10 +661,16 @@ public class SqlOnlyTenantIntegrationTests : IClassFixture<TestDatabaseFixture>,
         {
             try
             {
-                _catalogRepository.DisableTenantAsync(_testTenantId).GetAwaiter().GetResult();
+                TestDatabaseCleanupHelper.CleanupTenantAsync(
+                    _serviceProvider, 
+                    _testTenantId, 
+                    DatabaseType.SqlServer)
+                    .GetAwaiter()
+                    .GetResult();
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Warning: Failed to cleanup test tenant {_testTenantId}: {ex.Message}");
             }
         }
     }

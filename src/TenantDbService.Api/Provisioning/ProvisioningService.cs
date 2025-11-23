@@ -358,7 +358,21 @@ public class ProvisioningService
                 await masterConnection.OpenAsync();
                 
                 var databaseName = $"tenant_{tenantId}";
-                var dropDbQuery = $"IF EXISTS (SELECT * FROM sys.databases WHERE name = '{databaseName}') DROP DATABASE [{databaseName}]";
+                
+                var setSingleUserQuery = $@"
+                    IF EXISTS (SELECT * FROM sys.databases WHERE name = '{databaseName}')
+                    BEGIN
+                        ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                    END";
+                
+                await masterConnection.ExecuteAsync(setSingleUserQuery);
+                
+                var dropDbQuery = $@"
+                    IF EXISTS (SELECT * FROM sys.databases WHERE name = '{databaseName}')
+                    BEGIN
+                        DROP DATABASE [{databaseName}];
+                    END";
+                
                 await masterConnection.ExecuteAsync(dropDbQuery);
                 
                 _logger.LogInformation("Cleaned up SQL Server database: {DatabaseName}", databaseName);

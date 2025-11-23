@@ -56,12 +56,14 @@ GO
 -- Insert a sample tenant for testing (optional)
 IF NOT EXISTS (SELECT * FROM Tenants WHERE Name = 'demo-tenant')
 BEGIN
+    DECLARE @DemoTenantId NVARCHAR(32) = 'demo-tenant';
+    
     INSERT INTO Tenants (Id, Name, Status, CreatedAt)
-    VALUES ('demo-tenant', 'Demo Tenant', 'active', GETUTCDATE())
+    VALUES (@DemoTenantId, 'demo-tenant', 'active', GETUTCDATE())
     
     INSERT INTO TenantConnections (TenantId, SqlServerConnectionString, MongoDbConnectionString, MongoDbDatabaseName, CreatedAt)
     VALUES (
-        'demo-tenant',
+        @DemoTenantId,
         'Server=sqlserver,1433;Database=tenant_demo-tenant;User Id=sa;Password=P@ssw0rd!;TrustServerCertificate=True;',
         'mongodb://mongodb:27017',
         'tenant_demo-tenant',

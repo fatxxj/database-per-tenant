@@ -184,11 +184,28 @@ using (var scope = app.Services.CreateScope())
         await catalogDbContext.Database.EnsureCreatedAsync();
         app.Logger.LogInformation("Catalog database initialized successfully");
         
-        var existingTenants = await catalogRepository.GetAllTenantsAsync();
-        if (!existingTenants.Any())
+        var demoTenantExists = await catalogDbContext.Tenants
+            .AnyAsync(t => t.Name == "demo-tenant");
+        
+        if (!demoTenantExists)
         {
-            var demoTenantId = await provisioningService.CreateTenantAsync("demo-tenant", DatabaseType.Both);
-            app.Logger.LogInformation("Demo tenant created with ID: {TenantId} using database type: Both", demoTenantId);
+            try
+            {
+                var demoTenantId = await provisioningService.CreateTenantAsync("demo-tenant", DatabaseType.Both);
+                app.Logger.LogInformation("Demo tenant created with ID: {TenantId} using database type: Both", demoTenantId);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
+            {
+                app.Logger.LogInformation("Demo tenant was created by another process, skipping creation");
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Message.Contains("duplicate key"))
+            {
+                app.Logger.LogInformation("Demo tenant already exists in database, skipping creation");
+            }
+        }
+        else
+        {
+            app.Logger.LogInformation("Demo tenant already exists, skipping creation");
         }
     }
     catch (Exception ex)

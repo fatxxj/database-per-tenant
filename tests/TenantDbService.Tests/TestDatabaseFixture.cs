@@ -1,4 +1,6 @@
+using Dapper;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
@@ -16,9 +18,13 @@ namespace TenantDbService.Tests;
 public class TestDatabaseFixture : IDisposable
 {
     public IServiceProvider ServiceProvider { get; private set; }
+    private readonly string _testCatalogDatabaseName;
+    private readonly string _masterConnectionString;
 
     public TestDatabaseFixture()
     {
+        _testCatalogDatabaseName = $"test_catalog_{Guid.NewGuid():N}";
+        
         var testProjectDirectory = Path.GetDirectoryName(typeof(TestDatabaseFixture).Assembly.Location) 
             ?? Directory.GetCurrentDirectory();
         
@@ -39,8 +45,15 @@ public class TestDatabaseFixture : IDisposable
             builder.SetMinimumLevel(LogLevel.Warning);
         });
 
-        var catalogConnectionString = configuration.GetConnectionString("Catalog") 
-            ?? "Server=localhost,1433;Database=test_catalog;User Id=sa;Password=P@ssw0rd!;TrustServerCertificate=True;";
+        var baseConnectionString = configuration.GetConnectionString("Catalog") 
+            ?? "Server=localhost,1433;User Id=sa;Password=P@ssw0rd!;TrustServerCertificate=True;";
+        
+        var builder = new SqlConnectionStringBuilder(baseConnectionString);
+        builder.InitialCatalog = "master";
+        _masterConnectionString = builder.ConnectionString;
+        
+        builder.InitialCatalog = _testCatalogDatabaseName;
+        var catalogConnectionString = builder.ConnectionString;
         
         services.AddDbContext<CatalogDbContext>(options =>
             options.UseSqlServer(catalogConnectionString));
@@ -81,16 +94,71 @@ public class TestDatabaseFixture : IDisposable
 
         ServiceProvider = services.BuildServiceProvider();
 
+        CreateTestCatalogDatabase();
+        
         using var scope = ServiceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
         context.Database.EnsureCreated();
     }
 
+    private void CreateTestCatalogDatabase()
+    {
+        try
+        {
+            using var masterConnection = new SqlConnection(_masterConnectionString);
+            masterConnection.Open();
+            
+            var createDbQuery = $@"
+                IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = '{_testCatalogDatabaseName}')
+                BEGIN
+                    CREATE DATABASE [{_testCatalogDatabaseName}];
+                END";
+            
+            masterConnection.Execute(createDbQuery);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to create test catalog database '{_testCatalogDatabaseName}'. Ensure SQL Server is running and accessible.", ex);
+        }
+    }
+
     public void Dispose()
     {
+        // Dispose service provider first
         if (ServiceProvider is IDisposable disposable)
         {
             disposable.Dispose();
+        }
+
+        DropTestCatalogDatabase();
+    }
+
+    private void DropTestCatalogDatabase()
+    {
+        try
+        {
+            using var masterConnection = new SqlConnection(_masterConnectionString);
+            masterConnection.Open();
+            
+            var setSingleUserQuery = $@"
+                IF EXISTS (SELECT * FROM sys.databases WHERE name = '{_testCatalogDatabaseName}')
+                BEGIN
+                    ALTER DATABASE [{_testCatalogDatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                END";
+            
+            masterConnection.Execute(setSingleUserQuery);
+            
+            var dropDbQuery = $@"
+                IF EXISTS (SELECT * FROM sys.databases WHERE name = '{_testCatalogDatabaseName}')
+                BEGIN
+                    DROP DATABASE [{_testCatalogDatabaseName}];
+                END";
+            
+            masterConnection.Execute(dropDbQuery);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Failed to drop test catalog database '{_testCatalogDatabaseName}': {ex.Message}");
         }
     }
 }
