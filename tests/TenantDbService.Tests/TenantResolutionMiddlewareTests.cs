@@ -35,6 +35,13 @@ public class TenantResolutionMiddlewareTests
         var token = CreateJwtToken(tenantId);
         context.Request.Headers["Authorization"] = $"Bearer {token}";
 
+        var tenant = new Tenant
+        {
+            Id = tenantId,
+            Name = "Test Tenant",
+            Status = "active"
+        };
+
         var connections = new TenantConnections
         {
             TenantId = tenantId,
@@ -44,6 +51,7 @@ public class TenantResolutionMiddlewareTests
         };
 
         _catalogRepositoryMock.Setup(x => x.TenantExistsAsync(tenantId)).ReturnsAsync(true);
+        _catalogRepositoryMock.Setup(x => x.GetTenantAsync(tenantId)).ReturnsAsync(tenant);
         _catalogRepositoryMock.Setup(x => x.GetConnectionsAsync(tenantId)).ReturnsAsync(connections);
 
         // Act
@@ -67,6 +75,13 @@ public class TenantResolutionMiddlewareTests
         
         context.Request.Headers["X-Tenant-Id"] = tenantId;
 
+        var tenant = new Tenant
+        {
+            Id = tenantId,
+            Name = "Test Tenant",
+            Status = "active"
+        };
+
         var connections = new TenantConnections
         {
             TenantId = tenantId,
@@ -76,6 +91,7 @@ public class TenantResolutionMiddlewareTests
         };
 
         _catalogRepositoryMock.Setup(x => x.TenantExistsAsync(tenantId)).ReturnsAsync(true);
+        _catalogRepositoryMock.Setup(x => x.GetTenantAsync(tenantId)).ReturnsAsync(tenant);
         _catalogRepositoryMock.Setup(x => x.GetConnectionsAsync(tenantId)).ReturnsAsync(connections);
 
         // Act
@@ -137,7 +153,6 @@ public class TenantResolutionMiddlewareTests
     {
         // Arrange
         var context = CreateHttpContext();
-        // No tenant ID provided
 
         // Act
         await _middleware.InvokeAsync(context, _catalogRepositoryMock.Object);
@@ -156,7 +171,6 @@ public class TenantResolutionMiddlewareTests
         // Arrange
         var context = CreateHttpContext();
         context.Request.Path = "/health/live";
-        // No tenant ID provided
 
         // Act
         await _middleware.InvokeAsync(context, _catalogRepositoryMock.Object);
@@ -175,7 +189,15 @@ public class TenantResolutionMiddlewareTests
         
         context.Request.Headers["X-Tenant-Id"] = tenantId;
 
+        var tenant = new Tenant
+        {
+            Id = tenantId,
+            Name = "Test Tenant",
+            Status = "active"
+        };
+
         _catalogRepositoryMock.Setup(x => x.TenantExistsAsync(tenantId)).ReturnsAsync(true);
+        _catalogRepositoryMock.Setup(x => x.GetTenantAsync(tenantId)).ReturnsAsync(tenant);
         _catalogRepositoryMock.Setup(x => x.GetConnectionsAsync(tenantId)).ReturnsAsync((TenantConnections?)null);
 
         // Act
@@ -200,6 +222,13 @@ public class TenantResolutionMiddlewareTests
         context.Request.Headers["X-Tenant-Id"] = tenantId;
         context.Request.Headers["X-Correlation-ID"] = correlationId;
 
+        var tenant = new Tenant
+        {
+            Id = tenantId,
+            Name = "Test Tenant",
+            Status = "active"
+        };
+
         var connections = new TenantConnections
         {
             TenantId = tenantId,
@@ -209,6 +238,7 @@ public class TenantResolutionMiddlewareTests
         };
 
         _catalogRepositoryMock.Setup(x => x.TenantExistsAsync(tenantId)).ReturnsAsync(true);
+        _catalogRepositoryMock.Setup(x => x.GetTenantAsync(tenantId)).ReturnsAsync(tenant);
         _catalogRepositoryMock.Setup(x => x.GetConnectionsAsync(tenantId)).ReturnsAsync(connections);
 
         // Act

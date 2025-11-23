@@ -9,14 +9,14 @@ const tenantBReadLatency = new Trend('tenant_b_read_latency');
 // Configuration
 export const options = {
   stages: [
-    { duration: '30s', target: 10 }, // Ramp up
-    { duration: '2m', target: 10 },  // Steady load
-    { duration: '30s', target: 0 },  // Ramp down
+    { duration: '30s', target: 10 },
+    { duration: '2m', target: 10 },
+    { duration: '30s', target: 0 },
   ],
   thresholds: {
-    http_req_duration: ['p(95)<500'], // 95% of requests should be below 500ms
-    errors: ['rate<0.1'],             // Error rate should be less than 10%
-    'tenant_b_read_latency': ['p(95)<300'], // Tenant B reads should be fast
+    http_req_duration: ['p(95)<500'], 
+    errors: ['rate<0.1'],             
+    'tenant_b_read_latency': ['p(95)<300'], 
   },
 };
 
@@ -34,11 +34,11 @@ function findTenantByName(tenants, name) {
   return tenants.find(tenant => tenant.name === name);
 }
 
-// Setup function - runs once before the test
+// Setup function
 export function setup() {
   console.log('Setting up test data...');
   
-  // First, get all existing tenants
+  // get all existing tenants
   const listTenantsResponse = http.get(`${BASE_URL}/tenants`);
   if (listTenantsResponse.status !== 200) {
     fail(`Failed to list tenants: status ${listTenantsResponse.status} body=${listTenantsResponse.body}`);
@@ -65,7 +65,7 @@ export function setup() {
     });
     
     if (tenantAResponse.status === 409) {
-      // Tenant already exists, try to find it again
+      // Tenant already exists
       console.log(`Tenant A creation returned 409 (already exists), searching for existing tenant...`);
       const retryListResponse = http.get(`${BASE_URL}/tenants`);
       if (retryListResponse.status === 200) {
@@ -111,7 +111,7 @@ export function setup() {
     });
     
     if (tenantBResponse.status === 409) {
-      // Tenant already exists, try to find it again
+      // Tenant already exists
       console.log(`Tenant B creation returned 409 (already exists), searching for existing tenant...`);
       const retryListResponse = http.get(`${BASE_URL}/tenants`);
       if (retryListResponse.status === 200) {
@@ -317,9 +317,6 @@ export default function(data) {
 // Teardown function - runs once after the test
 export function teardown(data) {
   console.log('Cleaning up test data...');
-  
-  // In a real scenario, you might want to clean up the test tenants
-  // For now, we'll just log the completion
   console.log('Test completed');
 }
 

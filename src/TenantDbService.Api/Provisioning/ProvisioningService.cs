@@ -230,13 +230,11 @@ public class ProvisioningService
 
             var databaseName = $"tenant_{tenantId}";
             
-            // Check if database already exists
             var dbExistsQuery = "SELECT COUNT(*) FROM sys.databases WHERE name = @DatabaseName";
             var dbExists = await masterConnection.ExecuteScalarAsync<int>(dbExistsQuery, new { DatabaseName = databaseName });
             
             if (dbExists == 0)
             {
-                // Create database
                 var createDbQuery = $"CREATE DATABASE [{databaseName}]";
                 await masterConnection.ExecuteAsync(createDbQuery);
                 _logger.LogInformation("Created SQL Server database: {DatabaseName}", databaseName);
@@ -260,7 +258,6 @@ public class ProvisioningService
             var client = new MongoClient(_mongoSettings.Template);
             var database = client.GetDatabase(databaseName);
 
-            // Test connection
             await database.RunCommandAsync<MongoDB.Bson.BsonDocument>(new MongoDB.Bson.BsonDocument("ping", 1));
 
             _logger.LogInformation("MongoDB database provisioned for tenant: {TenantId}", tenantId);
@@ -281,27 +278,27 @@ public class ProvisioningService
             await connection.OpenAsync();
 
             var createOrdersTableSql = @"
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Orders')
-BEGIN
-    CREATE TABLE [Orders](
-        [Id] NVARCHAR(50) NOT NULL,
-        [Code] NVARCHAR(50) NOT NULL,
-        [Amount] DECIMAL(18,2) NOT NULL,
-        [CreatedAt] DATETIME2 NOT NULL,
-        CONSTRAINT [PK_Orders] PRIMARY KEY ([Id])
-    );
-END";
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Orders')
+                BEGIN
+                    CREATE TABLE [Orders](
+                        [Id] NVARCHAR(50) NOT NULL,
+                        [Code] NVARCHAR(50) NOT NULL,
+                        [Amount] DECIMAL(18,2) NOT NULL,
+                        [CreatedAt] DATETIME2 NOT NULL,
+                        CONSTRAINT [PK_Orders] PRIMARY KEY ([Id])
+                    );
+                END";
             await connection.ExecuteAsync(createOrdersTableSql);
 
             var createIndexesSql = @"
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Orders_CreatedAt' AND object_id = OBJECT_ID('Orders'))
-BEGIN
-    CREATE INDEX [IX_Orders_CreatedAt] ON [Orders] ([CreatedAt] DESC);
-END
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Orders_Code' AND object_id = OBJECT_ID('Orders'))
-BEGIN
-    CREATE INDEX [IX_Orders_Code] ON [Orders] ([Code]);
-END";
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Orders_CreatedAt' AND object_id = OBJECT_ID('Orders'))
+                BEGIN
+                    CREATE INDEX [IX_Orders_CreatedAt] ON [Orders] ([CreatedAt] DESC);
+                END
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Orders_Code' AND object_id = OBJECT_ID('Orders'))
+                BEGIN
+                    CREATE INDEX [IX_Orders_Code] ON [Orders] ([Code]);
+                END";
             await connection.ExecuteAsync(createIndexesSql);
 
             _logger.LogInformation("Ensured default Orders table for tenant: {TenantId}", tenantId);

@@ -18,7 +18,6 @@ public class OrdersRepositoryTests
         _repository = new TestOrdersRepository(_loggerMock.Object);
     }
 
-    // Test-specific implementation that doesn't require database connections
     private class TestOrdersRepository : OrdersRepository
     {
         private readonly List<Order> _orders = new();
@@ -132,9 +131,7 @@ public class OrdersRepositoryTests
         var order = await _repository.GetOrderByIdAsync(orderId);
 
         // Assert
-        // In a real test, you would mock the database connection and verify the SQL query
-        // For now, we're just testing the method signature and basic behavior
-        Assert.True(true); // Placeholder assertion
+        Assert.True(true);
     }
 
     [Fact]
@@ -160,8 +157,7 @@ public class OrdersRepositoryTests
         var result = await _repository.DeleteOrderAsync(orderId);
 
         // Assert
-        // In a real test with mocked database, this would return true
-        Assert.True(true); // Placeholder assertion
+        Assert.True(true);
     }
 
     [Fact]

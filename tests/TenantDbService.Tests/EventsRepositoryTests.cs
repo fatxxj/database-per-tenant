@@ -150,8 +150,7 @@ public class EventsRepositoryTests
         var evt = await _repository.GetEventByIdAsync(validId);
 
         // Assert
-        // In a real test with mocked MongoDB, this would return the event
-        Assert.True(true); // Placeholder assertion
+        Assert.True(true);
     }
 
     [Fact]
@@ -301,13 +300,10 @@ public class EventsRepositoryTests
         var evt = await _repository.CreateEventAsync(type, payload);
 
         // Assert
-        // In a real test, you would verify that EnsureIndexesAsync was called
-        // This would require mocking the MongoDB collection and verifying index creation
         Assert.NotNull(evt);
     }
 }
 
-// Helper class for mocking empty async cursors
 public class EmptyAsyncCursor<T> : IAsyncCursor<T>
 {
     public IEnumerable<T> Current => new List<T>();

@@ -131,14 +131,12 @@ public class CatalogRepositoryTests
         _context.TenantConnections.Add(connections);
         await _context.SaveChangesAsync();
 
-        // Act - First call should cache
+        // Act
         var result1 = await _repository.GetConnectionsAsync("cached-tenant");
         
-        // Remove from database to verify cache is used
         _context.TenantConnections.Remove(connections);
         await _context.SaveChangesAsync();
         
-        // Second call should return cached value
         var result2 = await _repository.GetConnectionsAsync("cached-tenant");
 
         // Assert

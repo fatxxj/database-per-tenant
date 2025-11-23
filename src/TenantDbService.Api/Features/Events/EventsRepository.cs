@@ -31,7 +31,6 @@ public class EventsRepository
         var database = await _mongoFactory.GetDatabaseAsync();
         var collection = database.GetCollection<Event>("events");
 
-        // Ensure index exists
         await EnsureIndexesAsync(collection);
 
         var filter = type != null 
@@ -55,10 +54,8 @@ public class EventsRepository
         var database = await _mongoFactory.GetDatabaseAsync();
         var collection = database.GetCollection<Event>("events");
 
-        // Ensure index exists
         await EnsureIndexesAsync(collection);
 
-        // Convert JsonElement to dictionary if needed
         var convertedPayload = ConvertPayload(payload);
 
         var evt = new Event
@@ -96,7 +93,6 @@ public class EventsRepository
         var database = await _mongoFactory.GetDatabaseAsync();
         var collection = database.GetCollection<Event>("events");
 
-        // Ensure index exists
         await EnsureIndexesAsync(collection);
 
         var events = await collection
@@ -124,7 +120,6 @@ public class EventsRepository
         await _indexSemaphore.WaitAsync();
         try
         {
-            // Check if index already exists
             var indexes = await collection.Indexes.ListAsync();
             var indexList = await indexes.ToListAsync();
             

@@ -15,7 +15,7 @@ example-payloads/
 
 ## 📂 Folder Contents
 
-### 🍃 mongodb-only/ (MongoDB-Only Tenants)
+### mongodb-only/ (MongoDB-Only Tenants)
 Examples for tenants that use MongoDB database only (databaseType: 2):
 
 - **03-create-tenant-mongodb-only.txt** - Create MongoDB-only tenant
@@ -25,7 +25,7 @@ Examples for tenants that use MongoDB database only (databaseType: 2):
 - **16-create-event.txt** - Create events (MongoDB)
 - **17-query-events-by-type.txt** - Query events by type
 
-### 🗄️ sql-only/ (SQL Server-Only Tenants)
+### sql-only/ (SQL Server-Only Tenants)
 Examples for tenants that use SQL Server database only (databaseType: 1):
 
 - **02-create-tenant-sqlserver-only.txt** - Create SQL Server-only tenant
@@ -35,7 +35,7 @@ Examples for tenants that use SQL Server database only (databaseType: 1):
 - **11-query-table-with-filters.txt** - Query with WHERE, ORDER BY, LIMIT
 - **15-create-order.txt** - Create orders (default SQL table)
 
-### 🔄 both/ (Hybrid Tenants)
+### both/ (Hybrid Tenants)
 Examples for tenants that use both SQL Server and MongoDB (databaseType: 3):
 
 - **04-create-tenant-both-databases.txt** - Create hybrid tenant
@@ -43,7 +43,7 @@ Examples for tenants that use both SQL Server and MongoDB (databaseType: 3):
 - **06-update-tenant-schema.txt** - Update tenant schema
 - **18-complete-workflow-example.txt** - **Full end-to-end workflow** (START HERE!)
 
-### 🌐 common/ (All Tenant Types)
+### common/ (All Tenant Types)
 Examples that work for all tenant types regardless of database configuration:
 
 - **01-auth-dev-token.txt** - Generate JWT token (all tenants)
@@ -54,7 +54,7 @@ Examples that work for all tenant types regardless of database configuration:
 - **22-get-specific-records.txt** - Get records by ID (SQL & MongoDB)
 - **23-delete-records.txt** - Delete records (SQL & MongoDB)
 
-## 🚀 Quick Start Guide
+## Quick Start Guide
 
 ### Step 1: Choose Your Tenant Type
 Based on your application needs:
@@ -78,7 +78,7 @@ Use `common/01-auth-dev-token.txt` to generate your JWT token.
 - **MongoDB Operations**: See `mongodb-only/` folder
 - **Common Operations**: See `common/` folder
 
-## 📋 Database Type Values
+## Database Type Values
 
 | Value | Enum | Folder | Description |
 |-------|------|--------|-------------|
@@ -86,7 +86,7 @@ Use `common/01-auth-dev-token.txt` to generate your JWT token.
 | 2 | `MongoDb` | `mongodb-only/` | MongoDB only - for document data |
 | 3 | `Both` | `both/` | Both databases - for hybrid applications |
 
-## 🔐 Authentication
+## Authentication
 
 All protected endpoints require:
 
@@ -97,7 +97,7 @@ X-Tenant-Id: {your-tenant-id}
 
 Generate token using `common/01-auth-dev-token.txt`
 
-## ⚠️ Important Notes
+## Important Notes
 
 ### Database Type Compatibility
 - **SQL Server endpoints** only work with tenants that have `databaseType: 1` or `3`
@@ -111,14 +111,14 @@ Generate token using `common/01-auth-dev-token.txt`
 - Query parameters have limits (max 1000 records)
 - Dangerous SQL keywords are blocked
 
-## 📖 File Naming Convention
+## File Naming Convention
 
 Files are numbered for easy reference:
 - **01-09**: Authentication & tenant management
 - **10-19**: Data operations (SQL & MongoDB)
 - **20-23**: Common operations & utilities
 
-## 🎯 Use Cases
+## Use Cases
 
 ### SQL Server Only (`sql-only/`)
 Perfect for SaaS applications that:
@@ -141,13 +141,13 @@ Best for SaaS applications that:
 - Need different databases for different features
 - Examples: E-commerce platforms, healthcare systems, complex enterprise applications
 
-## 📚 Additional Resources
+## Additional Resources
 
 - See main `README.md` for full API documentation
 - Check Swagger UI at http://localhost:8080/swagger
 - Review `both/18-complete-workflow-example.txt` for step-by-step guide
 
-## 🔄 Migration Notes
+## Migration Notes
 
 If you have existing tenants:
 - SQL-only tenants → Use `sql-only/` examples
@@ -156,5 +156,3 @@ If you have existing tenants:
 - All tenants → Use `common/` examples
 
 ---
-
-**Need Help?** Start with `both/18-complete-workflow-example.txt` for a complete walkthrough!

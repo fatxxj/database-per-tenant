@@ -5,17 +5,13 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy project files
 COPY ["src/TenantDbService.Api/TenantDbService.Api.csproj", "src/TenantDbService.Api/"]
 COPY ["src/TenantDbService.Contracts/TenantDbService.Contracts.csproj", "src/TenantDbService.Contracts/"]
 
-# Restore dependencies
 RUN dotnet restore "src/TenantDbService.Api/TenantDbService.Api.csproj"
 
-# Copy source code
 COPY . .
 
-# Build the application
 WORKDIR "/src/src/TenantDbService.Api"
 RUN dotnet build "TenantDbService.Api.csproj" -c Release -o /app/build
 
@@ -25,15 +21,12 @@ RUN dotnet publish "TenantDbService.Api.csproj" -c Release -o /app/publish /p:Us
 FROM base AS final
 WORKDIR /app
 
-# Install curl for health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=publish /app/publish .
 
-# Debug: List contents to verify files are copied
 RUN ls -la
 
-# Create a non-root user
 RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app
 USER appuser
 

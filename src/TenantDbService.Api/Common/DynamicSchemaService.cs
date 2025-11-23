@@ -25,7 +25,6 @@ public class DynamicSchemaService
             await CreateTableAsync(connection, table);
         }
 
-        // Create foreign keys after all tables exist
         foreach (var table in schema.Tables)
         {
             foreach (var foreignKey in table.ForeignKeys)
@@ -228,13 +227,11 @@ public class DynamicSchemaService
     {
         var errors = new List<string>();
 
-        // Validate schema name
         if (string.IsNullOrWhiteSpace(schema.Name))
         {
             errors.Add("Schema name is required");
         }
 
-        // Validate tables
         if (!schema.Tables.Any())
         {
             errors.Add("At least one table is required");
@@ -243,19 +240,16 @@ public class DynamicSchemaService
         var tableNames = new HashSet<string>();
         foreach (var table in schema.Tables)
         {
-            // Check for duplicate table names
             if (!tableNames.Add(table.Name))
             {
                 errors.Add($"Duplicate table name: {table.Name}");
                 continue;
             }
 
-            // Validate table
             var tableErrors = ValidateTable(table);
             errors.AddRange(tableErrors.Select(e => $"Table '{table.Name}': {e}"));
         }
 
-        // Validate foreign keys
         foreach (var table in schema.Tables)
         {
             foreach (var foreignKey in table.ForeignKeys)
@@ -324,7 +318,6 @@ public class DynamicSchemaService
             errors.Add("Data type is required");
         }
 
-        // Validate data type specific constraints
         switch (column.DataType.ToLower())
         {
             case "varchar":
@@ -350,7 +343,6 @@ public class DynamicSchemaService
     {
         var errors = new List<string>();
 
-        // Check if referenced table exists
         var referencedTable = allTables.FirstOrDefault(t => t.Name == foreignKey.ReferencedTable);
         if (referencedTable == null)
         {
@@ -358,7 +350,6 @@ public class DynamicSchemaService
             return errors;
         }
 
-        // Check if columns exist in source table
         var sourceTable = allTables.FirstOrDefault(t => t.Name == tableName);
         if (sourceTable != null)
         {
@@ -371,7 +362,6 @@ public class DynamicSchemaService
             }
         }
 
-        // Check if referenced columns exist
         foreach (var column in foreignKey.ReferencedColumns)
         {
             if (!referencedTable.Columns.Any(c => c.Name == column))
@@ -380,7 +370,6 @@ public class DynamicSchemaService
             }
         }
 
-        // Check column count match
         if (foreignKey.Columns.Count != foreignKey.ReferencedColumns.Count)
         {
             errors.Add("Number of columns must match number of referenced columns");

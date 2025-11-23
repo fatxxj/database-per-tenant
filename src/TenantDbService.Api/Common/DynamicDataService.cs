@@ -28,7 +28,6 @@ public class DynamicDataService
         _logger = logger;
     }
 
-    // SQL Server operations
     public async Task<List<Dictionary<string, object>>> QueryAsync(string tableName, string? whereClause = null, string? orderBy = null, int? limit = null)
     {
         using var connection = await _sqlFactory.CreateConnectionAsync();
@@ -125,7 +124,6 @@ public class DynamicDataService
         
         await connection.ExecuteAsync(sql, convertedData);
         
-        // Return the ID if it exists in the data
         return convertedData.ContainsKey("Id") ? convertedData["Id"].ToString()! : "";
     }
 
@@ -156,7 +154,6 @@ public class DynamicDataService
         return rowsAffected > 0;
     }
 
-    // MongoDB operations
     public async Task<List<Dictionary<string, object>>> QueryMongoAsync(string collectionName, string? filter = null, string? sort = null, int? limit = null)
     {
         var database = await _mongoFactory.GetDatabaseAsync();
@@ -197,7 +194,6 @@ public class DynamicDataService
         var database = await _mongoFactory.GetDatabaseAsync();
         var collection = database.GetCollection<MongoDB.Bson.BsonDocument>(collectionName);
 
-        // Generate ID if not provided
         if (!data.ContainsKey("_id"))
         {
             data["_id"] = Guid.NewGuid().ToString();
@@ -241,7 +237,6 @@ public class DynamicDataService
         return result.DeletedCount > 0;
     }
 
-    // Schema introspection
     public async Task<List<string>> GetTableNamesAsync()
     {
         using var connection = await _sqlFactory.CreateConnectionAsync();
@@ -299,7 +294,6 @@ public class DynamicDataService
         }
         else
         {
-            // Fallback for other dynamic types
             var properties = ((object)dapperRow).GetType().GetProperties();
             foreach (var prop in properties)
             {

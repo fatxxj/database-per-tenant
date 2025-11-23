@@ -19,7 +19,7 @@ BEGIN
     CREATE INDEX IX_Orders_Code_CreatedAt ON Orders (Code, CreatedAt DESC)
 END
 
--- Index on Amount for range queries (optional, depending on business needs)
+-- Index on Amount for range queries
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Orders_Amount')
 BEGIN
     CREATE INDEX IX_Orders_Amount ON Orders (Amount)

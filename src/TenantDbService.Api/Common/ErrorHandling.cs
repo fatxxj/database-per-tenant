@@ -50,13 +50,11 @@ public class GlobalExceptionHandler
             Type = $"https://httpstatuses.io/{(int)statusCode}"
         };
 
-        // Add correlation ID if available
         if (context.Items.TryGetValue("correlation.id", out var correlationId))
         {
             problemDetails.Extensions["correlationId"] = correlationId;
         }
 
-        // Add tenant ID if available
         if (context.Items.TryGetValue("tenant.ctx", out var tenantCtx) && tenantCtx is TenantContext ctx)
         {
             problemDetails.Extensions["tenantId"] = ctx.TenantId;

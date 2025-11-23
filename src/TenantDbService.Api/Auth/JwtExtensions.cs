@@ -27,7 +27,6 @@ public class JwtExtensions
         if (string.IsNullOrEmpty(tenantId))
             throw new ArgumentException("TenantId is required", nameof(tenantId));
 
-        // Validate tenantId format
         if (!IsValidTenantId(tenantId))
             throw new ArgumentException("Invalid tenantId format", nameof(tenantId));
 
@@ -55,7 +54,6 @@ public class JwtExtensions
 
     private static bool IsValidTenantId(string tenantId)
     {
-        // Validate tenantId format: lowercase [a-z0-9-]{6,32}
         return !string.IsNullOrEmpty(tenantId) && 
                tenantId.Length >= 6 && 
                tenantId.Length <= 32 && 
