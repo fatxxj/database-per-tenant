@@ -70,12 +70,8 @@ public class TestDatabaseFixture : IDisposable
 
         services.Configure<MongoSettings>(options =>
         {
-            var mongoTemplate = configuration["Mongo:Template"] ?? "mongodb://localhost:27017";
-            if (mongoTemplate.Contains("mongodb:27017") || mongoTemplate.Contains("@mongodb:"))
-            {
-                mongoTemplate = "mongodb://localhost:27017";
-            }
-            options.Template = mongoTemplate;
+            options.Template = configuration["Mongo:Template"] 
+                ?? "mongodb://admin:password@mongodb:27017";
             options.DatabaseTemplate = configuration["Mongo:DatabaseTemplate"] 
                 ?? "tenant_{TENANTID}";
         });

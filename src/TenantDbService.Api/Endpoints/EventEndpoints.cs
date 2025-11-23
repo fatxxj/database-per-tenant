@@ -32,3 +32,4 @@ public static class EventEndpoints
 
 public record CreateEventRequest(string Type, object Payload);
 
+

@@ -32,3 +32,4 @@ public static class TenantEndpoints
 
 public record CreateTenantRequest(string Name, DatabaseType DatabaseType = DatabaseType.Both, SchemaDefinition? SchemaDefinition = null);
 
+

@@ -44,3 +44,4 @@ public static class OrderEndpoints
 
 public record CreateOrderRequest(string Code, decimal Amount);
 
+
