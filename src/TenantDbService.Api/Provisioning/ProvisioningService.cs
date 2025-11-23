@@ -107,7 +107,7 @@ public class ProvisioningService
                 {
                     await EnsureDefaultSqlSchemaAsync(tenantId);
                 }
-                else
+                else if (schemaDefinition.Tables.Any() || schemaDefinition.Collections.Any())
                 {
                     await CreateDynamicSchemaAsync(tenantId, databaseType, schemaDefinition);
                 }

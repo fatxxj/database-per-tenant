@@ -232,11 +232,6 @@ public class DynamicSchemaService
             errors.Add("Schema name is required");
         }
 
-        if (!schema.Tables.Any())
-        {
-            errors.Add("At least one table is required");
-        }
-
         var tableNames = new HashSet<string>();
         foreach (var table in schema.Tables)
         {
@@ -256,6 +251,21 @@ public class DynamicSchemaService
             {
                 var fkErrors = ValidateForeignKey(table.Name, foreignKey, schema.Tables);
                 errors.AddRange(fkErrors);
+            }
+        }
+
+        var collectionNames = new HashSet<string>();
+        foreach (var collection in schema.Collections)
+        {
+            if (string.IsNullOrWhiteSpace(collection.Name))
+            {
+                errors.Add("Collection name is required");
+                continue;
+            }
+
+            if (!collectionNames.Add(collection.Name))
+            {
+                errors.Add($"Duplicate collection name: {collection.Name}");
             }
         }
 

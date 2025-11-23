@@ -5,7 +5,7 @@ namespace TenantDbService.Api.Common;
 public static class QuerySanitizer
 {
     private static readonly Regex SafeWhereClauseRegex = new(
-        @"^[\w\s\.,=<>!()'\-+*/%]+$", 
+        @"^[\w\s\.,=<>!()'\-+*/%\[\]@]+$", 
         RegexOptions.Compiled);
     
     private static readonly Regex SafeOrderByRegex = new(
