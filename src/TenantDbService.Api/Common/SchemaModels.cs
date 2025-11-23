@@ -110,7 +110,6 @@ public class CollectionDefinition
     public string? ValidationSchema { get; set; } // JSON schema for document validation
 }
 
-public record CreateTenantRequest(string Name, SchemaDefinition? SchemaDefinition = null);
 public record UpdateSchemaRequest(string SchemaDefinition);
 public record SchemaValidationRequest(SchemaDefinition SchemaDefinition);
 public record SchemaValidationResponse(bool IsValid, List<string> Errors);
